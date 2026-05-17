@@ -53,6 +53,8 @@ import { useCallStore } from '../modules/calling/store';
 
 import { triggerHaptic } from '../utils/haptics';
 
+const isIndefinitelyReadOnly = false;
+
 const DefaultAvatar = ({ name, size = 40 }) => {
   const colors = [
     '#FF5733', '#4ECCA3', '#3357FF', '#F333FF', '#FF33A8', 
@@ -438,7 +440,6 @@ export default function ChatDetail() {
   const isBlocked = !isGroup && (isBlockedDetail || safeChat.isBlocked || safeChat.chat_data?.isBlocked);
   const isBlockedByOther = !isGroup && (isBlockedByOtherDetail || safeChat.isBlockedByOther || safeChat.chat_data?.isBlockedByOther);
   
-  const isIndefinitelyReadOnly = false;
   const isReadOnly = isRemoved || isDeletedByMe || isDeletedByOther || isBlocked || isBlockedByOther || safeChat.status === 'pending_received' || safeChat.status === 'pending_sent' || safeChat.status === 'rejected' || isIndefinitelyReadOnly;
   
   // Check if any SHARED group has DMs disabled and neither user is the admin (Rule 1, 8)
