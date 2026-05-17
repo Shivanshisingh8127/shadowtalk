@@ -530,13 +530,13 @@ export default function Chats() {
                 }}
               >
                 {chat.pinned && <PinIcon size={12} style={{ position: 'absolute', top: '8px', right: '8px', color: 'var(--accent-secondary)', opacity: 0.8 }} />}
-                <div className={`avatar ${isGroup ? 'group' : ''}`} style={{ overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className={`avatar ${isGroup ? 'group' : ''}`} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {isGroup && (chat.avatarUrl || chat.avatar_url) ? (
-                    <img src={chat.avatarUrl || chat.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={chat.avatarUrl || chat.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                   ) : isGroup ? (
                     <DefaultAvatar name={name} />
                   ) : chat.contact?.avatarUrl ? (
-                    <img src={chat.contact.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={chat.contact.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                   ) : (
                     <DefaultAvatar name={name} />
                   )}
