@@ -1,0 +1,325 @@
+﻿
+> new-app-session@0.0.0 lint
+> eslint .
+
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\App.jsx
+   1:8  error  'React' is defined but never used               no-unused-vars
+  32:7  error  'BottomNav' is assigned a value but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\context\AppContext.jsx
+    1:8   error    'React' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   no-unused-vars
+    6:14  error    Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-refresh/only-export-components
+    9:7   error    'DEFAULT_USER' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   no-unused-vars
+   54:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  52 |       const handleChange = (e) => setTheme(e.matches ? 'dark' : 'light');
+  53 |
+> 54 |       setTheme(mediaQuery.matches ? 'dark' : 'light');
+     |       ^^^^^^^^ Avoid calling setState() directly within an effect
+  55 |       mediaQuery.addEventListener('change', handleChange);
+  56 |       return () => mediaQuery.removeEventListener('change', handleChange);
+  57 |     }  react-hooks/set-state-in-effect
+   72:9   error    Error: Cannot access variable before it is declared
+
+`loginMockUser` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  70 |         filter: `owner_id=eq.${user.id}`
+  71 |       }, () => {
+> 72 |         loginMockUser(user.name, user.id, user.phrase);
+     |         ^^^^^^^^^^^^^ `loginMockUser` accessed before it is declared
+  73 |       })
+  74 |       .on('postgres_changes', {
+  75 |         event: '*',
+
+  172 |     return phrase.join(' ');
+  173 |   };
+> 174 |   const loginMockUser = async (customName, customId, customPhrase) => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 175 |     const inputId = customId || '';
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 176 |     try {
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 336 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 337 |   };
+      | ^^^^^ `loginMockUser` is declared here
+  338 |   const logout = () => setUser(null);
+  339 |
+  340 |   const acceptRequest = async (request) => {  react-hooks/immutability
+  103:6   warning  React Hook useEffect has missing dependencies: 'loginMockUser', 'user.name', 'user.phrase', and 'user.shadowId'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+  115:6   warning  React Hook useEffect has missing dependencies: 'loginMockUser', 'user.name', and 'user.phrase'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+  688:11  error    'messagesModified' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               no-unused-vars
+  723:15  error    'otherMessagesModified' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\Appearance.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\BackupData.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\BlockedContacts.jsx
+  1:8   error  'React' is defined but never used   no-unused-vars
+  3:61  error  'Trash2' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\ChatDetail.jsx
+     3:103  error    'Users' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-unused-vars
+    66:10   error    'isUploading' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             no-unused-vars
+    80:35   error    'data' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    no-unused-vars
+   197:7    error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  195 |   useEffect(() => {
+  196 |     if (chat && chat.unreadCount > 0 && initialUnreadCount === 0) {
+> 197 |       setInitialUnreadCount(chat.unreadCount);
+      |       ^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  198 |       markAsRead(id);
+  199 |     }
+  200 |   }, [chat?.unreadCount, id]);  react-hooks/set-state-in-effect
+   200:6    warning  React Hook useEffect has missing dependencies: 'chat', 'initialUnreadCount', and 'markAsRead'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react-hooks/exhaustive-deps
+   206:6    warning  React Hook useEffect has a missing dependency: 'chat'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+   261:9    error    'confirmDelete' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           no-unused-vars
+   300:9    error    'openAdminDM' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             no-unused-vars
+  1188:43   error    'idx' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\Chats.jsx
+    1:8    error  'React' is defined but never used                        no-unused-vars
+    3:55   error  'Globe' is defined but never used                        no-unused-vars
+    3:80   error  'Fingerprint' is defined but never used                  no-unused-vars
+    3:104  error  'Edit2' is defined but never used                        no-unused-vars
+    3:144  error  'ArrowLeft' is defined but never used                    no-unused-vars
+    3:155  error  'Clock' is defined but never used                        no-unused-vars
+    3:162  error  'Check' is defined but never used                        no-unused-vars
+    3:201  error  'CheckCheck' is defined but never used                   no-unused-vars
+   38:16   error  'blockContact' is assigned a value but never used        no-unused-vars
+   38:30   error  'unblockContact' is assigned a value but never used      no-unused-vars
+   38:73   error  'updateChatSettings' is assigned a value but never used  no-unused-vars
+   41:18   error  'setSearch' is assigned a value but never used           no-unused-vars
+  753:7    error  'MessageSquareSlash' is assigned a value but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\ContactProfile.jsx
+    1:8   error    'React' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     no-unused-vars
+    5:27  error    'Search' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    no-unused-vars
+    6:33  error    'ImageIcon' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 no-unused-vars
+    7:64  error    'Crown' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     no-unused-vars
+   46:46  error    'unblockContact' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   no-unused-vars
+   66:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  64 |   useEffect(() => {
+  65 |     if (chat) {
+> 66 |       setNickname(chat.contact?.nickname || chat.contact?.name || chat.name || '');
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  67 |       setPinned(chat.pinned || false);
+  68 |       setNotifications(chat.notificationType || 'All Messages');
+  69 |       setMuteUntil(chat.muteUntil || null);  react-hooks/set-state-in-effect
+   73:7   error    Error: Cannot access variable before it is declared
+
+`setTempDisappearType` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  71 |       const config = chat.disappearingConfig || { type: 'Off', timer: '1 Hour' };
+  72 |       setDisappearingState(config.type === 'Off' ? 'Off' : `${config.type} (${config.timer})`);
+> 73 |       setTempDisappearType(config.type);
+     |       ^^^^^^^^^^^^^^^^^^^^ `setTempDisappearType` accessed before it is declared
+  74 |       setTempDisappearTimer(config.timer);
+  75 |
+  76 |       // Handle Quick Actions from Dashboard
+
+  101 |
+  102 |   // Disappearing messages temporary state
+> 103 |   const [tempDisappearType, setTempDisappearType] = useState('Off');
+      |                             ^^^^^^^^^^^^^^^^^^^^ `setTempDisappearType` is declared here
+  104 |   const [tempDisappearTimer, setTempDisappearTimer] = useState('1 Hour');
+  105 |
+  106 |   // Notifications temporary state                                                                                react-hooks/immutability
+   74:7   error    Error: Cannot access variable before it is declared
+
+`setTempDisappearTimer` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  72 |       setDisappearingState(config.type === 'Off' ? 'Off' : `${config.type} (${config.timer})`);
+  73 |       setTempDisappearType(config.type);
+> 74 |       setTempDisappearTimer(config.timer);
+     |       ^^^^^^^^^^^^^^^^^^^^^ `setTempDisappearTimer` accessed before it is declared
+  75 |
+  76 |       // Handle Quick Actions from Dashboard
+  77 |       const params = new URLSearchParams(window.location.search);
+
+  102 |   // Disappearing messages temporary state
+  103 |   const [tempDisappearType, setTempDisappearType] = useState('Off');
+> 104 |   const [tempDisappearTimer, setTempDisappearTimer] = useState('1 Hour');
+      |                              ^^^^^^^^^^^^^^^^^^^^^ `setTempDisappearTimer` is declared here
+  105 |
+  106 |   // Notifications temporary state
+  107 |   const [tempNotificationType, setTempNotificationType] = useState(notifications);       react-hooks/immutability
+   79:9   error    Error: Cannot access variable before it is declared
+
+`setShowMuteModal` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  77 |       const params = new URLSearchParams(window.location.search);
+  78 |       if (params.get('action') === 'mute') {
+> 79 |         setShowMuteModal(true);
+     |         ^^^^^^^^^^^^^^^^ `setShowMuteModal` accessed before it is declared
+  80 |       }
+  81 |     }
+  82 |   }, [chat]);
+
+  107 |   const [tempNotificationType, setTempNotificationType] = useState(notifications);
+  108 |   const [showMuteTimer, setShowMuteTimer] = useState(false);
+> 109 |   const [showMuteModal, setShowMuteModal] = useState(false);
+      |                         ^^^^^^^^^^^^^^^^ `setShowMuteModal` is declared here
+  110 |   const [muteTimer, setMuteTimer] = useState(null);
+  111 |
+  112 |   // Attachments state                                                                                                                                                                                   react-hooks/immutability
+   92:7   error    Error: Cannot access variable before it is declared
+
+`setSelectedMemberInfo` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  90 |   useEffect(() => {
+  91 |     if (location.state?.selectedMember) {
+> 92 |       setSelectedMemberInfo(location.state.selectedMember);
+     |       ^^^^^^^^^^^^^^^^^^^^^ `setSelectedMemberInfo` accessed before it is declared
+  93 |     }
+  94 |     if (location.state?.view) {
+  95 |       setActiveView(location.state.view);
+
+  116 |   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  117 |   const [addMemberId, setAddMemberId] = useState('');
+> 118 |   const [selectedMemberInfo, setSelectedMemberInfo] = useState(null);
+      |                              ^^^^^^^^^^^^^^^^^^^^^ `setSelectedMemberInfo` is declared here
+  119 |
+  120 |   useEffect(() => {
+  121 |     if (!muteUntil) return;                                                                                                                                                             react-hooks/immutability
+   95:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  93 |     }
+  94 |     if (location.state?.view) {
+> 95 |       setActiveView(location.state.view);
+     |       ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  96 |     }
+  97 |   }, [location.state]);
+  98 |                                                                                                                                                              react-hooks/set-state-in-effect
+  139:6   warning  React Hook useEffect has missing dependencies: 'id' and 'updateChatSettings'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+  156:9   error    'showToast' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-undef
+  159:9   error    'showToast' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-undef
+  163:9   error    'showToast' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-undef
+  167:9   error    'showToast' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-undef
+  173:9   error    'showToast' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-undef
+  178:7   error    'showToast' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-undef
+  207:7   error    'showToast' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-undef
+  210:7   error    'showToast' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-undef
+  237:9   error    'executeDangerAction' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              no-unused-vars
+  536:90  error    'i' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\CreateGroup.jsx
+   1:8   error  'React' is defined but never used  no-unused-vars
+  76:16  error  'err' is defined but never used    no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\Groups.jsx
+  1:8   error  'React' is defined but never used          no-unused-vars
+  7:18  error  'user' is assigned a value but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\IdentityCreation.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\InviteFriend.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\JoinCommunity.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\LinkedDevices.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\NewChat.jsx
+   1:8  error    'React' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           no-unused-vars
+  28:7  error    Error: Cannot access variable before it is declared
+
+`handleStartChat` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  26 |   useEffect(() => {
+  27 |     if (presetId && autoSubmit && !isSearching) {
+> 28 |       handleStartChat({ preventDefault: () => {} });
+     |       ^^^^^^^^^^^^^^^ `handleStartChat` accessed before it is declared
+  29 |     }
+  30 |   }, [presetId, autoSubmit]);
+  31 |
+
+   30 |   }, [presetId, autoSubmit]);
+   31 |
+>  32 |   const handleStartChat = async (e) => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  33 |     e.preventDefault();
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+>  34 |     if (!sessionId.trim() || isSearching) return;
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+> 185 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+> 186 |   };
+      | ^^^^^ `handleStartChat` is declared here
+  187 |
+  188 |   return (
+  189 |     <div className="app-container animate-fade-in" style={{ backgroundColor: '#121212', color: '#fff', display: 'flex', flexDirection: 'column' }}>  react-hooks/immutability
+  30:6  warning  React Hook useEffect has missing dependencies: 'handleStartChat' and 'isSearching'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\Onboarding.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\RecoveryPassword.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\Requests.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\SearchContacts.jsx
+   1:8   error  'React' is defined but never used              no-unused-vars
+  40:29  error  'setChats' is assigned a value but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\SecuritySetup.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\Settings.jsx
+    1:8    error  'React' is defined but never used                   no-unused-vars
+    5:85   error  'ScanLine' is defined but never used                no-unused-vars
+    5:103  error  'Play' is defined but never used                    no-unused-vars
+   31:7    error  'Toggle' is assigned a value but never used         no-unused-vars
+   56:27   error  'setTheme' is assigned a value but never used       no-unused-vars
+   56:37   error  'settings' is assigned a value but never used       no-unused-vars
+   81:11   error  'err' is defined but never used                     no-unused-vars
+  187:9    error  'toggleSetting' is assigned a value but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\SettingsConversations.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\SettingsPrivacy.jsx
+  1:8   error  'React' is defined but never used     no-unused-vars
+  1:17  error  'useState' is defined but never used  no-unused-vars
+
+C:\Users\LENOVOO\OneDrive\Desktop\new app session\src\pages\Splash.jsx
+  1:8  error  'React' is defined but never used  no-unused-vars
+
+Γ£û 88 problems (82 errors, 6 warnings)
+

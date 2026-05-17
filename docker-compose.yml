@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  signaling-server:
+    build: ./server
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+    networks:
+      - shadowtalk-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - shadowtalk-net
+
+networks:
+  shadowtalk-net:
+    driver: bridge
