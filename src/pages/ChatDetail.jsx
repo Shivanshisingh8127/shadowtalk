@@ -1249,6 +1249,8 @@ export default function ChatDetail() {
       setPendingAttachments([]);
       setReplyTo(null);
       setTypingStatus(id, false);
+      setShowEmojiPicker(false);
+      setShowAttachments(false);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     }
   };
@@ -1530,6 +1532,7 @@ export default function ChatDetail() {
       <div 
         ref={scrollContainerRef}
         onScroll={handleScroll}
+        onClick={() => { setShowEmojiPicker(false); setShowAttachments(false); }}
         style={{ 
           flex: 1, 
           overflowY: 'auto', 
@@ -2800,8 +2803,8 @@ export default function ChatDetail() {
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
               {!finalIsReadOnly && (
                 <div style={{ display: 'flex', gap: '4px', paddingBottom: '4px' }}>
-                  <button className="icon-btn glass-morphism-light" onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ border: 'none' }}><SmileIcon size={24} color="var(--text-muted)" /></button>
-                  <button className="icon-btn glass-morphism-light" onClick={() => setShowAttachments(!showAttachments)} style={{ border: 'none' }}><PaperclipIcon size={24} color="var(--text-muted)" /></button>
+                  <button className="icon-btn glass-morphism-light" onClick={() => { const newVal = !showEmojiPicker; setShowEmojiPicker(newVal); if (newVal) setShowAttachments(false); }} style={{ border: 'none' }}><SmileIcon size={24} color="var(--text-muted)" /></button>
+                  <button className="icon-btn glass-morphism-light" onClick={() => { const newVal = !showAttachments; setShowAttachments(newVal); if (newVal) setShowEmojiPicker(false); }} style={{ border: 'none' }}><PaperclipIcon size={24} color="var(--text-muted)" /></button>
                 </div>
               )}
               
@@ -2813,6 +2816,7 @@ export default function ChatDetail() {
                   value={inputText}
                   disabled={finalIsReadOnly}
                   onChange={(e) => handleTyping(e.target.value)}
+                  onFocus={() => { setShowEmojiPicker(false); setShowAttachments(false); }}
                   onPaste={async (e) => {
                     if (finalIsReadOnly) return;
                     const items = e.clipboardData?.items;
