@@ -2368,7 +2368,7 @@ export const AppProvider = ({ children }) => {
     const isBlocked = targetChat?.isBlocked || targetChat?.chat_data?.isBlocked;
     const isBlockedByOther = targetChat?.isBlockedByOther || targetChat?.chat_data?.isBlockedByOther;
 
-    if (isBlocked || isBlockedByOther || isDeletedByMe || (isDeletedByOther && !isReconnectionAttempt) || targetChat?.status === 'pending_sent' || targetChat?.status === 'pending_received') {
+    if (isBlocked || isBlockedByOther || (isDeletedByOther && !isReconnectionAttempt) || targetChat?.status === 'pending_sent' || targetChat?.status === 'pending_received') {
       let msg = targetChat?.status === 'removed' ? 'You are no longer a participant in this group.' :
         isBlocked ? 'You blocked this contact.' :
           isBlockedByOther ? 'You have been blocked.' :
@@ -2394,10 +2394,8 @@ export const AppProvider = ({ children }) => {
         return;
       }
 
-      if (otherData?.chat_data?.status === 'deleted' || otherData?.chat_data?.isDeletedByOther) {
-        showToast('This conversation is read-only. You must reconnect to message.', 'error');
-        return;
-      }
+      // Removed restriction on deleted chats to allow talking after clearing conversation
+    }
     }
 
     const isSelf = canonicalId === user.id.toLowerCase();
@@ -2490,6 +2488,7 @@ export const AppProvider = ({ children }) => {
 
             const updated = {
               ...chat,
+              status: chat.status === 'deleted' ? 'direct' : chat.status,
               messages: [...(chat.messages || []), newMessage],
               unreadCount: 0, // Auto-reset when sending
               lastActivity: Date.now()
@@ -2610,6 +2609,7 @@ export const AppProvider = ({ children }) => {
           chat_id: myIdLower,
           chat_data: {
             ...otherChatData,
+            status: otherChatData.status === 'deleted' ? 'direct' : otherChatData.status,
             messages: [], // Clear message blob
             unreadCount: shouldIncrementUnread ? (otherChatData.unreadCount || 0) + 1 : (otherChatData.unreadCount || 0),
             lastActivity: Date.now()
