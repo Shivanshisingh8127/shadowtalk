@@ -1106,6 +1106,19 @@ export const AppProvider = ({ children }) => {
                 } : null
               };
               supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
+
+              // Broadcast seen status back to the sender
+              if (chatSubRef.current) {
+                chatSubRef.current.send({
+                  type: 'broadcast',
+                  event: 'MESSAGE_STATUS_UPDATE',
+                  payload: {
+                    chatId: myId,
+                    messageIds: [msg.id],
+                    status: 'seen'
+                  }
+                });
+              }
             }
           } else {
             if (decryptedMsg.status === 'sent') {
@@ -1119,6 +1132,19 @@ export const AppProvider = ({ children }) => {
                 } : null
               };
               supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
+
+              // Broadcast delivered status back to the sender
+              if (chatSubRef.current) {
+                chatSubRef.current.send({
+                  type: 'broadcast',
+                  event: 'MESSAGE_STATUS_UPDATE',
+                  payload: {
+                    chatId: myId,
+                    messageIds: [msg.id],
+                    status: 'delivered'
+                  }
+                });
+              }
             }
           }
         }
@@ -1354,6 +1380,8 @@ export const AppProvider = ({ children }) => {
     const myIdLower = userId.toLowerCase();
     
     const promises = [];
+    const statusMap = {}; // { chat_id: { seen: [ids], delivered: [ids] } }
+
     chatsList.forEach(chat => {
       if (chat.type === 'direct' && chat.messages && chat.messages.length > 0) {
         const incomingSentMessages = chat.messages.filter(m => 
@@ -1366,6 +1394,10 @@ export const AppProvider = ({ children }) => {
           const finalStatus = isViewingThisChat ? 'seen' : 'delivered';
           const finalRead = isViewingThisChat;
           
+          const cid = chat.id.toLowerCase();
+          if (!statusMap[cid]) statusMap[cid] = { seen: [], delivered: [] };
+          statusMap[cid][finalStatus].push(m.id);
+
           console.log(`[ShadowTalk] Marking message ${m.id} as ${finalStatus}`);
           const updatedContent = { ...m, status: finalStatus, read: finalRead };
           if (finalRead && m.deleteAfterRead && !m.deleteAt) {
@@ -1387,6 +1419,52 @@ export const AppProvider = ({ children }) => {
       }
     });
     
+    // Send status broadcast to senders
+    Object.entries(statusMap).forEach(([cid, data]) => {
+      if (data.seen.length > 0 && chatSubRef.current) {
+        chatSubRef.current.send({
+          type: 'broadcast',
+          event: 'MESSAGE_STATUS_UPDATE',
+          payload: {
+            chatId: myIdLower,
+            messageIds: data.seen,
+            status: 'seen'
+          }
+        });
+      }
+      if (data.delivered.length > 0 && chatSubRef.current) {
+        chatSubRef.current.send({
+          type: 'broadcast',
+          event: 'MESSAGE_STATUS_UPDATE',
+          payload: {
+            chatId: myIdLower,
+            messageIds: data.delivered,
+            status: 'delivered'
+          }
+        });
+      }
+    });
+
+    // Update local setChats directly so receiver's UI is immediate
+    setChats(prev => prev.map(chat => {
+      const cid = chat.id.toLowerCase();
+      if (statusMap[cid]) {
+        return {
+          ...chat,
+          messages: (chat.messages || []).map(m => {
+            const isMatch = m.senderId?.toLowerCase() !== myIdLower && m.status === 'sent';
+            if (isMatch) {
+              const isViewingThisChat = activeChatIdRef.current && String(activeChatIdRef.current).toLowerCase() === cid;
+              const finalStatus = isViewingThisChat ? 'seen' : 'delivered';
+              return { ...m, status: finalStatus, read: isViewingThisChat };
+            }
+            return m;
+          })
+        };
+      }
+      return chat;
+    }));
+
     if (promises.length > 0) {
       try {
         await Promise.all(promises);
@@ -2588,10 +2666,18 @@ export const AppProvider = ({ children }) => {
     if (!user?.id) return;
     const canonicalChatId = chatId.toLowerCase();
 
-    // 1. Update local chat metadata
+    // 1. Update local chat metadata AND message statuses to 'seen' / 'read: true'
     setChats(prev => prev.map(chat => {
       if (chat.id.toLowerCase() === canonicalChatId) {
-        return { ...chat, unreadCount: 0 };
+        return {
+          ...chat,
+          unreadCount: 0,
+          messages: (chat.messages || []).map(m =>
+            m.senderId?.toLowerCase() !== user.id.toLowerCase()
+              ? { ...m, read: true, status: 'seen' }
+              : m
+          )
+        };
       }
       return chat;
     }));
@@ -2616,10 +2702,26 @@ export const AppProvider = ({ children }) => {
     const targetChat = (chatsRef.current || chats).find(c => c.id.toLowerCase() === canonicalChatId);
     if (!targetChat) return;
 
-    const unreadMessages = (targetChat.messages || []).filter(m => m.senderId !== user.id && !m.read);
+    const unreadMessages = (targetChat.messages || []).filter(m => m.senderId?.toLowerCase() !== user.id.toLowerCase() && !m.read);
     if (unreadMessages.length === 0) return;
 
     const now = Date.now();
+    const unreadMsgIds = unreadMessages.map(m => m.id);
+
+    // 4. Send real-time broadcast of seen status to the sender
+    if (chatSubRef.current) {
+      chatSubRef.current.send({
+        type: 'broadcast',
+        event: 'MESSAGE_STATUS_UPDATE',
+        payload: {
+          chatId: userRef.current?.id?.toLowerCase(), // Tell the sender that messages in our chat with them are seen
+          messageIds: unreadMsgIds,
+          status: 'seen'
+        }
+      });
+      console.log('[ShadowTalk] Broadcasted seen status for:', unreadMsgIds);
+    }
+
     const updatePromises = unreadMessages.map(async m => {
       const updatedContent = { ...m, read: true, status: 'seen' };
 
