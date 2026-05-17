@@ -75,7 +75,17 @@ export const AppProvider = ({ children }) => {
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState();
-        const activeIds = new Set(Object.keys(state).map(k => k.toLowerCase()));
+        const activeIds = new Set();
+        Object.entries(state).forEach(([key, presenceItems]) => {
+          activeIds.add(key.toLowerCase());
+          if (Array.isArray(presenceItems)) {
+            presenceItems.forEach(item => {
+              if (item.shadowId) {
+                activeIds.add(item.shadowId.toLowerCase());
+              }
+            });
+          }
+        });
         console.log('[ShadowTalk] Presence Sync - active user IDs:', Array.from(activeIds));
         setOnlineUsers(activeIds);
 
@@ -83,7 +93,9 @@ export const AppProvider = ({ children }) => {
         setChats(prev => prev.map(chat => {
           if (chat.type === 'direct' && chat.contact) {
             const contactIdLower = chat.contact.id?.toLowerCase();
-            const isContactOnline = activeIds.has(contactIdLower);
+            const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+            const isContactOnline = (contactIdLower && activeIds.has(contactIdLower)) ||
+                                    (contactShadowIdLower && activeIds.has(contactShadowIdLower));
             if (chat.contact.isOnline !== isContactOnline) {
               return {
                 ...chat,
@@ -98,6 +110,7 @@ export const AppProvider = ({ children }) => {
         if (status === 'SUBSCRIBED') {
           await presenceChannel.track({
             online_at: new Date().toISOString(),
+            shadowId: user.shadowId?.toLowerCase()
           });
         }
       });
@@ -431,11 +444,15 @@ export const AppProvider = ({ children }) => {
       const { chatId, messageIds, status } = payload.payload;
       console.log('[ShadowTalk] Status broadcast:', status, messageIds);
       setChats(prev => prev.map(chat => {
-        if (chat.id.toLowerCase() === chatId.toLowerCase()) {
+        const cid = chatId.toLowerCase();
+        const isMatch = chat.id.toLowerCase() === cid ||
+                        (chat.contact?.id && chat.contact.id.toLowerCase() === cid) ||
+                        (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === cid);
+        if (isMatch) {
           return {
             ...chat,
             messages: (chat.messages || []).map(m =>
-              messageIds.includes(m.id) ? { ...m, status } : m
+              messageIds.includes(m.id) ? { ...m, status, read: status === 'seen' } : m
             )
           };
         }
@@ -1089,7 +1106,12 @@ export const AppProvider = ({ children }) => {
 
         // Live Ticks Auto-Seen & Auto-Delivered on INSERT
         if (payload.eventType === 'INSERT' && msg.sender_id?.toLowerCase() !== myId?.toLowerCase() && !isGroup) {
-          const isViewingThisChat = activeChatIdRef.current && String(activeChatIdRef.current).toLowerCase() === gid;
+          const activeChat = (chatsRef.current || chats || []).find(c => String(c.id).toLowerCase() === String(activeChatIdRef.current).toLowerCase());
+          const isViewingThisChat = activeChat && (
+            activeChat.id.toLowerCase() === gid ||
+            (activeChat.contact?.id && activeChat.contact.id.toLowerCase() === gid) ||
+            (activeChat.contact?.shadowId && activeChat.contact.shadowId.toLowerCase() === gid)
+          );
           if (isViewingThisChat) {
             if (decryptedMsg.status !== 'seen') {
               decryptedMsg.status = 'seen';
@@ -1152,7 +1174,10 @@ export const AppProvider = ({ children }) => {
         setChats(prev => {
           let updated = false;
           const newChats = prev.map(chat => {
-            if (chat.id.toLowerCase() === gid) {
+            const isMatch = chat.id.toLowerCase() === gid ||
+                            (chat.contact?.id && chat.contact.id.toLowerCase() === gid) ||
+                            (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === gid);
+            if (isMatch) {
               // [PRIVACY] Filter out if message was deleted for me
               if (chat.deletedForMe?.includes(msg.id)) return chat;
 
@@ -1390,14 +1415,18 @@ export const AppProvider = ({ children }) => {
         );
         
         incomingSentMessages.forEach(m => {
-          const isViewingThisChat = activeChatIdRef.current && String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase();
+          const isViewingThisChat = activeChatIdRef.current && (
+            String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase() ||
+            (chat.contact?.id && String(activeChatIdRef.current).toLowerCase() === chat.contact.id.toLowerCase()) ||
+            (chat.contact?.shadowId && String(activeChatIdRef.current).toLowerCase() === chat.contact.shadowId.toLowerCase())
+          );
           const finalStatus = isViewingThisChat ? 'seen' : 'delivered';
           const finalRead = isViewingThisChat;
           
           const cid = chat.id.toLowerCase();
           if (!statusMap[cid]) statusMap[cid] = { seen: [], delivered: [] };
           statusMap[cid][finalStatus].push(m.id);
-
+ 
           console.log(`[ShadowTalk] Marking message ${m.id} as ${finalStatus}`);
           const updatedContent = { ...m, status: finalStatus, read: finalRead };
           if (finalRead && m.deleteAfterRead && !m.deleteAt) {
@@ -1444,7 +1473,7 @@ export const AppProvider = ({ children }) => {
         });
       }
     });
-
+ 
     // Update local setChats directly so receiver's UI is immediate
     setChats(prev => prev.map(chat => {
       const cid = chat.id.toLowerCase();
@@ -1454,7 +1483,11 @@ export const AppProvider = ({ children }) => {
           messages: (chat.messages || []).map(m => {
             const isMatch = m.senderId?.toLowerCase() !== myIdLower && m.status === 'sent';
             if (isMatch) {
-              const isViewingThisChat = activeChatIdRef.current && String(activeChatIdRef.current).toLowerCase() === cid;
+              const isViewingThisChat = activeChatIdRef.current && (
+                String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase() ||
+                (chat.contact?.id && String(activeChatIdRef.current).toLowerCase() === chat.contact.id.toLowerCase()) ||
+                (chat.contact?.shadowId && String(activeChatIdRef.current).toLowerCase() === chat.contact.shadowId.toLowerCase())
+              );
               const finalStatus = isViewingThisChat ? 'seen' : 'delivered';
               return { ...m, status: finalStatus, read: isViewingThisChat };
             }
@@ -2279,7 +2312,16 @@ export const AppProvider = ({ children }) => {
 
     let targetChat = chats.find(chat => chat.id === chatId);
     const isSelf = canonicalId === user.id.toLowerCase();
-    const isReceiverOnline = isSelf || onlineUsersRef.current?.has(canonicalId);
+    
+    let isReceiverOnline = isSelf;
+    if (!isReceiverOnline) {
+      const contactId = targetChat?.contact?.id?.toLowerCase();
+      const contactShadowId = targetChat?.contact?.shadowId?.toLowerCase();
+      isReceiverOnline = (contactId && onlineUsersRef.current?.has(contactId)) ||
+                         (contactShadowId && onlineUsersRef.current?.has(contactShadowId)) ||
+                         onlineUsersRef.current?.has(canonicalId);
+    }
+    
     const initialStatus = isSelf ? 'seen' : (isReceiverOnline ? 'delivered' : 'sent');
     const initialRead = isSelf;
 

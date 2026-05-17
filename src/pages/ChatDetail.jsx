@@ -984,8 +984,10 @@ export default function ChatDetail() {
   const [initialUnreadCount, setInitialUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (safeChat && safeChat.unreadCount > 0 && initialUnreadCount === 0) {
-      setInitialUnreadCount(safeChat.unreadCount);
+    if (safeChat && safeChat.unreadCount > 0) {
+      if (initialUnreadCount === 0) {
+        setInitialUnreadCount(safeChat.unreadCount);
+      }
       markAsRead(id);
     }
   }, [safeChat?.unreadCount, id]);
