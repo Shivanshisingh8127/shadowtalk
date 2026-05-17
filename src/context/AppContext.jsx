@@ -52,11 +52,81 @@ export const AppProvider = ({ children }) => {
   const [confirmConfig, setConfirmConfig] = useState(null); // { title, message, onConfirm, onCancel, icon }
   const [callNotifications, setCallNotifications] = useState([]); // Real-time call toasts
 
+  const [activeChatId, setActiveChatId] = useState(null);
+  const activeChatIdRef = useRef(null);
+  useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
+
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const onlineUsersRef = useRef(new Set());
+  useEffect(() => { onlineUsersRef.current = onlineUsers; }, [onlineUsers]);
+
+  // Real-time Presence Tracking
+  useEffect(() => {
+    if (!user?.id) return;
+    const myIdLower = user.id.toLowerCase();
+    const presenceChannel = supabase.channel('online-status', {
+      config: {
+        presence: {
+          key: myIdLower,
+        },
+      },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const activeIds = new Set(Object.keys(state).map(k => k.toLowerCase()));
+        console.log('[ShadowTalk] Presence Sync - active user IDs:', Array.from(activeIds));
+        setOnlineUsers(activeIds);
+
+        // Dynamically update online status of contacts in local chats state
+        setChats(prev => prev.map(chat => {
+          if (chat.type === 'direct' && chat.contact) {
+            const contactIdLower = chat.contact.id?.toLowerCase();
+            const isContactOnline = activeIds.has(contactIdLower);
+            if (chat.contact.isOnline !== isContactOnline) {
+              return {
+                ...chat,
+                contact: { ...chat.contact, isOnline: isContactOnline }
+              };
+            }
+          }
+          return chat;
+        }));
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      presenceChannel.unsubscribe();
+    };
+  }, [user?.id]);
+
+  // Handle Browser Coming Online Sweep
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[ShadowTalk] Browser came online, refreshing connection...');
+      if (userRef.current) {
+        loginMockUser(userRef.current.name, userRef.current.id, userRef.current.phrase, true);
+      }
+    };
+    
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
   // Settings
   const [settings, setSettings] = useState(() => {
     const defaultSettings = {
       notifications: true,
-      readReceipts: false,
+      readReceipts: true,
       typingIndicators: false,
       autoTrim: false,
       sendWithEnter: false,
@@ -1017,6 +1087,42 @@ export const AppProvider = ({ children }) => {
           decryptedMsg = { ...messageContent, id: msg.id, senderId: msg.sender_id, timestamp: Date.now() };
         }
 
+        // Live Ticks Auto-Seen & Auto-Delivered on INSERT
+        if (payload.eventType === 'INSERT' && msg.sender_id?.toLowerCase() !== myId?.toLowerCase() && !isGroup) {
+          const isViewingThisChat = activeChatIdRef.current && String(activeChatIdRef.current).toLowerCase() === gid;
+          if (isViewingThisChat) {
+            if (decryptedMsg.status !== 'seen') {
+              decryptedMsg.status = 'seen';
+              decryptedMsg.read = true;
+              if (decryptedMsg.deleteAfterRead && !decryptedMsg.deleteAt) {
+                decryptedMsg.deleteAt = Date.now() + (decryptedMsg.disappearDuration || 3600000);
+              }
+              const dbContent = {
+                ...decryptedMsg,
+                text: encrypt(decryptedMsg.text, gid),
+                replyTo: decryptedMsg.replyTo ? {
+                  ...decryptedMsg.replyTo,
+                  text: encrypt(decryptedMsg.replyTo.text, gid)
+                } : null
+              };
+              supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
+            }
+          } else {
+            if (decryptedMsg.status === 'sent') {
+              decryptedMsg.status = 'delivered';
+              const dbContent = {
+                ...decryptedMsg,
+                text: encrypt(decryptedMsg.text, gid),
+                replyTo: decryptedMsg.replyTo ? {
+                  ...decryptedMsg.replyTo,
+                  text: encrypt(decryptedMsg.replyTo.text, gid)
+                } : null
+              };
+              supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
+            }
+          }
+        }
+
         setChats(prev => {
           let updated = false;
           const newChats = prev.map(chat => {
@@ -1242,6 +1348,55 @@ export const AppProvider = ({ children }) => {
     }
     return phrase.join(' ');
   };
+  const markIncomingMessagesAsDelivered = async (chatsList, currentUserId = null) => {
+    const userId = currentUserId || userRef.current?.id;
+    if (!userId) return;
+    const myIdLower = userId.toLowerCase();
+    
+    const promises = [];
+    chatsList.forEach(chat => {
+      if (chat.type === 'direct' && chat.messages && chat.messages.length > 0) {
+        const incomingSentMessages = chat.messages.filter(m => 
+          m.senderId?.toLowerCase() !== myIdLower && 
+          m.status === 'sent'
+        );
+        
+        incomingSentMessages.forEach(m => {
+          const isViewingThisChat = activeChatIdRef.current && String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase();
+          const finalStatus = isViewingThisChat ? 'seen' : 'delivered';
+          const finalRead = isViewingThisChat;
+          
+          console.log(`[ShadowTalk] Marking message ${m.id} as ${finalStatus}`);
+          const updatedContent = { ...m, status: finalStatus, read: finalRead };
+          if (finalRead && m.deleteAfterRead && !m.deleteAt) {
+            updatedContent.deleteAt = Date.now() + (m.disappearDuration || 3600000);
+          }
+          
+          const encrypted = {
+            ...updatedContent,
+            text: encrypt(updatedContent.text, chat.id.toLowerCase()),
+            replyTo: updatedContent.replyTo ? {
+              ...updatedContent.replyTo,
+              text: encrypt(updatedContent.replyTo.text, chat.id.toLowerCase())
+            } : null
+          };
+          promises.push(
+            supabase.from('messages').update({ content: encrypted }).eq('id', m.id)
+          );
+        });
+      }
+    });
+    
+    if (promises.length > 0) {
+      try {
+        await Promise.all(promises);
+        console.log(`[ShadowTalk] Marked ${promises.length} messages as delivered/seen on startup.`);
+      } catch (err) {
+        console.error('[ShadowTalk] Error delivering/seen messages on startup:', err);
+      }
+    }
+  };
+
   const loginMockUser = async (customName, customId, customPhrase, silent = false) => {
     if (!silent) setIsLoading(true);
     const inputId = customId || '';
@@ -1605,6 +1760,7 @@ export const AppProvider = ({ children }) => {
         const finalMerged = Array.from(dedupedMap.values());
         setChats(finalMerged);
         console.log('[ShadowTalk] loginMockUser finished. Merged chats count:', finalMerged.length);
+        markIncomingMessagesAsDelivered(finalMerged, shortId);
       } else {
         setChats([]);
         console.log('[ShadowTalk] loginMockUser finished. No chats found.');
@@ -2044,6 +2200,11 @@ export const AppProvider = ({ children }) => {
     }
 
     let targetChat = chats.find(chat => chat.id === chatId);
+    const isSelf = canonicalId === user.id.toLowerCase();
+    const isReceiverOnline = isSelf || onlineUsersRef.current?.has(canonicalId);
+    const initialStatus = isSelf ? 'seen' : (isReceiverOnline ? 'delivered' : 'sent');
+    const initialRead = isSelf;
+
     const newMessage = {
       id: `m_${Date.now()}`,
       text,
@@ -2056,8 +2217,8 @@ export const AppProvider = ({ children }) => {
       } : null,
       senderId: user.id,
       timestamp: Date.now(),
-      read: false,
-      status: 'sent',
+      read: initialRead,
+      status: initialStatus,
       seenBy: [user.id],
       ...(forwardedData || {})
     };
@@ -2452,7 +2613,7 @@ export const AppProvider = ({ children }) => {
     }
 
     // 3. Find unread messages from local state and UPDATE the atomic messages table
-    const targetChat = chats.find(c => c.id.toLowerCase() === canonicalChatId);
+    const targetChat = (chatsRef.current || chats).find(c => c.id.toLowerCase() === canonicalChatId);
     if (!targetChat) return;
 
     const unreadMessages = (targetChat.messages || []).filter(m => m.senderId !== user.id && !m.read);
@@ -3775,7 +3936,10 @@ export const AppProvider = ({ children }) => {
     lastSyncRef,
     downloadCache: downloadCacheRef.current,
     downloadFile,
-    showConfirm
+    showConfirm,
+    activeChatId,
+    setActiveChatId,
+    onlineUsers
   };
 
   window.AppContextValue = contextValue;

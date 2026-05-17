@@ -91,7 +91,7 @@ export default function ChatDetail() {
     settings, startCall, isLoading, updateChatSettings, updateGroupSettings, loginMockUser, decrypt, acceptRequest, rejectRequest,
     blockContact, unblockContact, inviteFriend, broadcastProfileUpdate, downloadFile,
     forwardMessage, toggleStarMessage, togglePinMessage, archiveChat, setTypingStatus, typingUsers,
-    updateChatTheme, showConfirm
+    updateChatTheme, showConfirm, setActiveChatId
   } = useAppContext();
   const searchParams = new URLSearchParams(location.search);
   const initialSearchMode = searchParams.get('search') === 'true';
@@ -134,6 +134,13 @@ export default function ChatDetail() {
   const [newName, setNewName] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState([]); // [{ type, url, name }]
   const [previewMedia, setPreviewMedia] = useState(null);
+
+  useEffect(() => {
+    if (setActiveChatId) {
+      setActiveChatId(id);
+      return () => setActiveChatId(null);
+    }
+  }, [id, setActiveChatId]);
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [messageToForward, setMessageToForward] = useState(null);
   const [mentionSearch, setMentionSearch] = useState(null); // { query: string, index: number }
@@ -1460,11 +1467,15 @@ export default function ChatDetail() {
                       </>
                     )}
                   </div>
-                  {typingUsers[id] && Object.values(typingUsers[id]).some(v => v) && (
+                  {typingUsers[id] && Object.values(typingUsers[id]).some(v => v) ? (
                     <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600, animation: 'pulse 1.5s infinite' }}>
                       typing...
                     </span>
-                  )}
+                  ) : (!isGroup && safeChat.contact?.isOnline && !isReadOnly && !isNoteToSelf) ? (
+                    <span style={{ fontSize: '0.75rem', color: '#4ECCA3', fontWeight: 600 }}>
+                      online
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -2171,11 +2182,11 @@ export default function ChatDetail() {
                     {isMine && (
                       <div style={{ marginLeft: '4px', display: 'flex', alignItems: 'center' }}>
                         {settings.readReceipts && (msg.status === 'seen' || msg.read) ? (
-                          <CheckCheckIcon size={14} color={isMine ? '#000' : '#34b7f1'} style={{ opacity: isMine ? 0.7 : 1 }} />
+                          <CheckCheckIcon size={14} color="#34b7f1" style={{ opacity: 1 }} />
                         ) : msg.status === 'delivered' ? (
-                          <CheckCheckIcon size={14} color={isMine ? '#000' : 'var(--text-muted)'} style={{ opacity: 0.5 }} />
+                          <CheckCheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
                         ) : (
-                          <CheckIcon size={14} color={isMine ? '#000' : 'var(--text-muted)'} style={{ opacity: 0.5 }} />
+                          <CheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
                         )}
                       </div>
                     )}
