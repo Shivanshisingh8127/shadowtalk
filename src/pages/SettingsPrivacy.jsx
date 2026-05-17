@@ -79,49 +79,7 @@ export default function SettingsPrivacy() {
           rightElement={<Toggle checked={settings.voiceVideo || false} onChange={() => toggleSetting('voiceVideo')} />}
         />
 
-        <SectionTitle title="Screen Security" />
-        <SettingRow 
-          title="Lock App" 
-          description="Require fingerprint, PIN, pattern or password to unlock ShadowTalk."
-          rightElement={<Toggle checked={settings.lockApp || false} onChange={() => toggleSetting('lockApp')} />}
-        />
-        <SettingRow 
-          title="Set PIN" 
-          description={`Current PIN: ${settings.appPin}`}
-          onClick={() => {
-            const newPin = prompt('Enter new 4-digit PIN:', settings.appPin);
-            if (newPin && newPin.length === 4 && /^\d+$/.test(newPin)) {
-              setSettings(prev => ({ ...prev, appPin: newPin }));
-            } else if (newPin) {
-              alert('Invalid PIN. Please enter exactly 4 digits.');
-            }
-          }}
-        />
-        <div style={{ marginTop: '12px' }}>
-          <button 
-            onClick={() => setSettings(prev => ({ ...prev, lockApp: true }))}
-            style={{ 
-              width: 'calc(100% - 24px)', 
-              margin: '0 12px', 
-              padding: '14px', 
-              borderRadius: '12px', 
-              backgroundColor: 'var(--accent-primary)', 
-              color: '#000', 
-              fontWeight: 700,
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            Lock App Now
-          </button>
-        </div>
 
-        <SectionTitle title="Message Requests" />
-        <SettingRow 
-          title="Community Message Requests" 
-          description="Allow message requests from Community conversations."
-          rightElement={<Toggle checked={settings.commRequests || false} onChange={() => toggleSetting('commRequests')} />}
-        />
 
         {/* Blocking section removed as requested */}
 
