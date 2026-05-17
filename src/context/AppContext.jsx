@@ -2585,14 +2585,24 @@ export const AppProvider = ({ children }) => {
                 .maybeSingle()
                 .then(({ data: otherData }) => {
                   const actualOwnerId = otherData?.owner_id || canonicalOtherId;
-                  const otherChatData = otherData?.chat_data || {
-                    id: user.id,
-                    type: 'direct',
-                    status: 'direct',
-                    contact: { id: user.id, shadowId: user.shadowId, name: user.name || 'ShadowTalk User' },
-                    messages: [],
-                    unreadCount: 0
-                  };
+                  const otherChatData = otherData?.chat_data || {};
+                  
+                  // Ensure basic properties are set if it's a new or empty chat_data
+                  if (!otherChatData.id) otherChatData.id = user.id;
+                  if (!otherChatData.type) otherChatData.type = 'direct';
+                  if (!otherChatData.status) otherChatData.status = 'direct';
+                  
+                  // Ensure contact is populated
+                  if (!otherChatData.contact || !otherChatData.contact.name) {
+                    otherChatData.contact = {
+                      id: user.id,
+                      shadowId: user.shadowId,
+                      name: user.name || 'ShadowTalk User'
+                    };
+                  }
+                  
+                  if (otherChatData.messages === undefined) otherChatData.messages = [];
+                  if (otherChatData.unreadCount === undefined) otherChatData.unreadCount = 0;
 
                   let shouldIncrementUnread = true;
                   if (otherChatData.notificationType === 'Mentions Only') {
@@ -3399,7 +3409,7 @@ export const AppProvider = ({ children }) => {
     // Find and delete actual record
     const { data: records } = await supabase
       .from('chats')
-      .select('owner_id')
+      .select('owner_id, chat_data')
       .or(`owner_id.eq."${user.id}",owner_id.eq."${user.shadowId}"`)
       .eq('chat_id', chatId)
       .limit(1);
@@ -3409,8 +3419,8 @@ export const AppProvider = ({ children }) => {
     if (data?.owner_id) {
       // Instead of deleting, mark as deleted and clear messages array
       // This preserves clearedAt timestamp so old messages don't reappear
-      const currentChat = chatsRef.current?.find(c => c.id === chatId);
-      const updatedChatData = currentChat ? { ...currentChat, status: 'deleted', messages: [] } : { status: 'deleted', messages: [] };
+      const existingChatData = data.chat_data || {};
+      const updatedChatData = { ...existingChatData, status: 'deleted', messages: [] };
       
       await supabase.from('chats').update({
         chat_data: updatedChatData
