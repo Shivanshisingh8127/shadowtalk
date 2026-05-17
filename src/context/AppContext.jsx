@@ -1105,7 +1105,7 @@ export const AppProvider = ({ children }) => {
         }
 
         // Live Ticks Auto-Seen & Auto-Delivered on INSERT
-        if (payload.eventType === 'INSERT' && msg.sender_id?.toLowerCase() !== myId?.toLowerCase() && !isGroup) {
+        if (payload.eventType === 'INSERT' && msg.sender_id?.toLowerCase() !== myId?.toLowerCase()) {
           const activeChat = (chatsRef.current || chats || []).find(c =>
             String(c.id).toLowerCase() === String(activeChatIdRef.current).toLowerCase() ||
             (c.contact?.id && String(c.contact.id).toLowerCase() === String(activeChatIdRef.current).toLowerCase()) ||
@@ -1116,61 +1116,80 @@ export const AppProvider = ({ children }) => {
             (activeChat.contact?.id && activeChat.contact.id.toLowerCase() === gid) ||
             (activeChat.contact?.shadowId && activeChat.contact.shadowId.toLowerCase() === gid)
           );
-          if (isViewingThisChat) {
-            if (decryptedMsg.status !== 'seen') {
-              decryptedMsg.status = 'seen';
-              decryptedMsg.read = true;
-              if (decryptedMsg.deleteAfterRead && !decryptedMsg.deleteAt) {
-                decryptedMsg.deleteAt = Date.now() + (decryptedMsg.disappearDuration || 3600000);
-              }
-              const dbContent = {
-                ...decryptedMsg,
-                text: encrypt(decryptedMsg.text, gid),
-                replyTo: decryptedMsg.replyTo ? {
-                  ...decryptedMsg.replyTo,
-                  text: encrypt(decryptedMsg.replyTo.text, gid)
-                } : null
-              };
-              supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
+          if (!isGroup) {
+            if (isViewingThisChat) {
+              if (decryptedMsg.status !== 'seen') {
+                decryptedMsg.status = 'seen';
+                decryptedMsg.read = true;
+                if (decryptedMsg.deleteAfterRead && !decryptedMsg.deleteAt) {
+                  decryptedMsg.deleteAt = Date.now() + (decryptedMsg.disappearDuration || 3600000);
+                }
+                const dbContent = {
+                  ...decryptedMsg,
+                  text: encrypt(decryptedMsg.text, gid),
+                  replyTo: decryptedMsg.replyTo ? {
+                    ...decryptedMsg.replyTo,
+                    text: encrypt(decryptedMsg.replyTo.text, gid)
+                  } : null
+                };
+                supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
 
-              // Broadcast seen status back to the sender
-              if (chatSubRef.current) {
-                chatSubRef.current.send({
-                  type: 'broadcast',
-                  event: 'MESSAGE_STATUS_UPDATE',
-                  payload: {
-                    chatId: myId,
-                    messageIds: [msg.id],
-                    status: 'seen'
-                  }
-                });
+                // Broadcast seen status back to the sender
+                if (chatSubRef.current) {
+                  chatSubRef.current.send({
+                    type: 'broadcast',
+                    event: 'MESSAGE_STATUS_UPDATE',
+                    payload: {
+                      chatId: myId,
+                      messageIds: [msg.id],
+                      status: 'seen'
+                    }
+                  });
+                }
+              }
+            } else {
+              if (decryptedMsg.status === 'sent') {
+                decryptedMsg.status = 'delivered';
+                const dbContent = {
+                  ...decryptedMsg,
+                  text: encrypt(decryptedMsg.text, gid),
+                  replyTo: decryptedMsg.replyTo ? {
+                    ...decryptedMsg.replyTo,
+                    text: encrypt(decryptedMsg.replyTo.text, gid)
+                  } : null
+                };
+                supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
+
+                // Broadcast delivered status back to the sender
+                if (chatSubRef.current) {
+                  chatSubRef.current.send({
+                    type: 'broadcast',
+                    event: 'MESSAGE_STATUS_UPDATE',
+                    payload: {
+                      chatId: myId,
+                      messageIds: [msg.id],
+                      status: 'delivered'
+                    }
+                  });
+                }
               }
             }
           } else {
-            if (decryptedMsg.status === 'sent') {
-              decryptedMsg.status = 'delivered';
-              const dbContent = {
-                ...decryptedMsg,
-                text: encrypt(decryptedMsg.text, gid),
-                replyTo: decryptedMsg.replyTo ? {
-                  ...decryptedMsg.replyTo,
-                  text: encrypt(decryptedMsg.replyTo.text, gid)
-                } : null
-              };
-              supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
-
-              // Broadcast delivered status back to the sender
-              if (chatSubRef.current) {
-                chatSubRef.current.send({
-                  type: 'broadcast',
-                  event: 'MESSAGE_STATUS_UPDATE',
-                  payload: {
-                    chatId: myId,
-                    messageIds: [msg.id],
-                    status: 'delivered'
-                  }
-                });
-              }
+            // Group Chat Live Ticks
+            if (isViewingThisChat) {
+              console.log(`[ShadowTalk] Marking group message ${msg.id} as seen (live)`);
+              supabase.rpc('append_message_status', {
+                msg_id: msg.id,
+                user_id: myId,
+                status_type: 'seen'
+              }).then();
+            } else {
+              console.log(`[ShadowTalk] Marking group message ${msg.id} as delivered (live)`);
+              supabase.rpc('append_message_status', {
+                msg_id: msg.id,
+                user_id: myId,
+                status_type: 'delivered'
+              }).then();
             }
           }
         }
@@ -1412,6 +1431,7 @@ export const AppProvider = ({ children }) => {
     const statusMap = {}; // { chat_id: { seen: [ids], delivered: [ids] } }
 
     chatsList.forEach(chat => {
+      // Direct Chats
       if (chat.type === 'direct' && chat.messages && chat.messages.length > 0) {
         const incomingSentMessages = chat.messages.filter(m => 
           m.senderId?.toLowerCase() !== myIdLower && 
@@ -1448,6 +1468,44 @@ export const AppProvider = ({ children }) => {
           promises.push(
             supabase.from('messages').update({ content: encrypted }).eq('id', m.id)
           );
+        });
+      }
+
+      // Group Chats
+      if (chat.type === 'group' && chat.messages && chat.messages.length > 0) {
+        const incomingMessages = chat.messages.filter(m => 
+          m.senderId?.toLowerCase() !== myIdLower &&
+          m.type !== 'notification' // Ignore notifications
+        );
+        
+        incomingMessages.forEach(m => {
+          const isViewingThisChat = activeChatIdRef.current && (
+            String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase()
+          );
+          
+          // Check if already marked
+          const isDelivered = m.deliveredTo && m.deliveredTo.includes(myIdLower);
+          const isSeen = m.seenBy && m.seenBy.includes(myIdLower);
+          
+          if (isViewingThisChat && !isSeen) {
+            console.log(`[ShadowTalk] Marking group message ${m.id} as seen`);
+            promises.push(
+              supabase.rpc('append_message_status', {
+                msg_id: m.id,
+                user_id: myIdLower,
+                status_type: 'seen'
+              })
+            );
+          } else if (!isViewingThisChat && !isDelivered && !isSeen) {
+            console.log(`[ShadowTalk] Marking group message ${m.id} as delivered`);
+            promises.push(
+              supabase.rpc('append_message_status', {
+                msg_id: m.id,
+                user_id: myIdLower,
+                status_type: 'delivered'
+              })
+            );
+          }
         });
       }
     });

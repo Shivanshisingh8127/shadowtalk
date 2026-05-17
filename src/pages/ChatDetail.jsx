@@ -2183,12 +2183,32 @@ export default function ChatDetail() {
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     {isMine && (
                       <div style={{ marginLeft: '4px', display: 'flex', alignItems: 'center' }}>
-                        {settings.readReceipts && (msg.status === 'seen' || msg.read) ? (
-                          <CheckCheckIcon size={14} color="#34b7f1" style={{ opacity: 1 }} />
-                        ) : msg.status === 'delivered' ? (
-                          <CheckCheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
+                        {isGroup ? (
+                          // Group Chat Ticks
+                          (msg.seenBy && msg.seenBy.length >= (safeChat.members?.length || 1) - 1) ? (
+                            settings.readReceipts ? (
+                              <CheckCheckIcon size={14} color="#34b7f1" style={{ opacity: 1 }} />
+                            ) : (
+                              <CheckCheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
+                            )
+                          ) : (msg.deliveredTo && msg.deliveredTo.length >= (safeChat.members?.length || 1) - 1) ? (
+                            <CheckCheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
+                          ) : (
+                            <CheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
+                          )
                         ) : (
-                          <CheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
+                          // Direct Chat Ticks
+                          (msg.status === 'seen' || msg.read) ? (
+                            settings.readReceipts ? (
+                              <CheckCheckIcon size={14} color="#34b7f1" style={{ opacity: 1 }} />
+                            ) : (
+                              <CheckCheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
+                            )
+                          ) : msg.status === 'delivered' ? (
+                            <CheckCheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
+                          ) : (
+                            <CheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
+                          )
                         )}
                       </div>
                     )}
