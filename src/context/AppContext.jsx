@@ -2396,7 +2396,6 @@ export const AppProvider = ({ children }) => {
 
       // Removed restriction on deleted chats to allow talking after clearing conversation
     }
-    }
 
     const isSelf = canonicalId === user.id.toLowerCase();
     
@@ -2531,119 +2530,123 @@ export const AppProvider = ({ children }) => {
     };
 
     // 1. Insert for SENDER — chat_id = recipient's ID (single record, no _rec needed)
-    const { data: dbMsg } = await supabase.from('messages').insert({
+    supabase.from('messages').insert({
       id: newMessage.id,
       chat_id: canonicalId,           // recipient's canonical ID
       sender_id: user.id.toLowerCase(),
       content: encryptedMsg,
       delete_at: newMessage.deleteAt || null
-    }).select('created_at').single();
-
-    // Sync the sender's local timestamp to match the exact server database time
-    if (dbMsg?.created_at) {
-      const serverTime = new Date(dbMsg.created_at).getTime();
-      setChats(prev => prev.map(c => {
-        if (c.id.toLowerCase() === canonicalId) {
-          const msgs = [...(c.messages || [])];
-          const idx = msgs.findIndex(m => m.id === newMessage.id);
-          if (idx >= 0) {
-            msgs[idx] = { ...msgs[idx], timestamp: serverTime };
-            msgs.sort((a, b) => a.timestamp - b.timestamp);
+    }).select('created_at').single()
+    .then(({ data: dbMsg }) => {
+      // Sync the sender's local timestamp to match the exact server database time
+      if (dbMsg?.created_at) {
+        const serverTime = new Date(dbMsg.created_at).getTime();
+        setChats(prev => prev.map(c => {
+          if (c.id.toLowerCase() === canonicalId) {
+            const msgs = [...(c.messages || [])];
+            const idx = msgs.findIndex(m => m.id === newMessage.id);
+            if (idx >= 0) {
+              msgs[idx] = { ...msgs[idx], timestamp: serverTime };
+              msgs.sort((a, b) => a.timestamp - b.timestamp);
+            }
+            return { ...c, messages: msgs, lastActivity: Math.max(c.lastActivity || 0, serverTime) };
           }
-          return { ...c, messages: msgs, lastActivity: Math.max(c.lastActivity || 0, serverTime) };
-        }
-        return c;
-      }));
-    }
+          return c;
+        }));
+      }
 
-    // 2. Persist Metadata (LIGHT BLOB)
-    // IMPORTANT: Clear messages array in blob to avoid storage bloat/routing bugs
-    const chatMetadata = { ...targetChat, messages: [] };
-    await supabase.from('chats').upsert({
-      owner_id: user.id.toLowerCase(),
-      chat_id: canonicalId,
-      chat_data: { ...chatMetadata, lastActivity: Date.now(), messages: [] }
-    }, { onConflict: 'owner_id, chat_id' });
+      // 2. Persist Metadata (LIGHT BLOB)
+      const chatMetadata = { ...targetChat, messages: [] };
+      return supabase.from('chats').upsert({
+        owner_id: user.id.toLowerCase(),
+        chat_id: canonicalId,
+        chat_data: { ...chatMetadata, lastActivity: Date.now(), messages: [] }
+      }, { onConflict: 'owner_id, chat_id' });
+    })
+    .then(() => {
+      // 3. Update recipient's metadata (for direct chats)
+      if (targetChat.type === 'direct') {
+        const otherId = canonicalId;
+        supabase
+          .from('users')
+          .select('id, shadow_id')
+          .or(`id.eq."${otherId}",shadow_id.eq."${otherId}"`)
+          .maybeSingle()
+          .then(({ data: recipientUser }) => {
+            const canonicalOtherId = recipientUser?.id || otherId;
+            const isSelf = canonicalOtherId === user.id;
 
-    // 3. Update recipient's metadata (for direct chats)
-    if (targetChat.type === 'direct') {
-      const otherId = canonicalId;
-      const { data: recipientUser } = await supabase
-        .from('users')
-        .select('id, shadow_id')
-        .or(`id.eq."${otherId}",shadow_id.eq."${otherId}"`)
-        .maybeSingle();
+            if (!isSelf) {
+              supabase
+                .from('chats')
+                .select('owner_id, chat_data')
+                .eq('owner_id', canonicalOtherId)
+                .eq('chat_id', user.id)
+                .maybeSingle()
+                .then(({ data: otherData }) => {
+                  const actualOwnerId = otherData?.owner_id || canonicalOtherId;
+                  const otherChatData = otherData?.chat_data || {
+                    id: user.id,
+                    type: 'direct',
+                    status: 'direct',
+                    contact: { id: user.id, shadowId: user.shadowId, name: user.name || 'ShadowTalk User' },
+                    messages: [],
+                    unreadCount: 0
+                  };
 
-      const canonicalOtherId = recipientUser?.id || otherId;
-      const isSelf = canonicalOtherId === user.id;
+                  let shouldIncrementUnread = true;
+                  if (otherChatData.notificationType === 'Mentions Only') {
+                    shouldIncrementUnread = text.includes(`@${user.shadowId || user.id}`);
+                  } else if (otherChatData.notificationType === 'Mute' || (otherChatData.muteUntil && otherChatData.muteUntil > Date.now())) {
+                    shouldIncrementUnread = false;
+                  }
 
-      if (!isSelf) {
-        // Update recipient's chat metadata (no message blob stored)
-        const { data: otherData } = await supabase
-          .from('chats')
-          .select('owner_id, chat_data')
-          .eq('owner_id', canonicalOtherId)
-          .eq('chat_id', user.id)
-          .maybeSingle();
+                  const myIdLower = user.id.toLowerCase();
+                  supabase.from('chats').upsert({
+                    owner_id: actualOwnerId.toLowerCase(),
+                    chat_id: myIdLower,
+                    chat_data: {
+                      ...otherChatData,
+                      status: otherChatData.status === 'deleted' ? 'direct' : otherChatData.status,
+                      messages: [], // Clear message blob
+                      unreadCount: shouldIncrementUnread ? (otherChatData.unreadCount || 0) + 1 : (otherChatData.unreadCount || 0),
+                      lastActivity: Date.now()
+                    }
+                  }, { onConflict: 'owner_id, chat_id' })
+                  .then(({ error }) => {
+                    if (error) console.error('[ShadowTalk] Error in upsert:', error);
+                  });
+                });
+            }
+          });
+      } else if (targetChat.type === 'group') {
+        const memberUpdates = targetChat.members.map((member) => {
+          if (member.id === user.id) return Promise.resolve(); // Skip self
+          return supabase
+            .from('chats')
+            .select('chat_data')
+            .eq('owner_id', member.id)
+            .eq('chat_id', chatId)
+            .maybeSingle()
+            .then(({ data: memberData }) => {
+              const baseChat = memberData?.chat_data || targetChat;
+              const updatedMemberChat = {
+                ...baseChat,
+                messages: [], // Keep it light
+                unreadCount: (baseChat.unreadCount || 0) + 1,
+                lastActivity: Date.now()
+              };
 
-        const actualOwnerId = otherData?.owner_id || canonicalOtherId;
-        const otherChatData = otherData?.chat_data || {
-          id: user.id,
-          type: 'direct',
-          status: 'direct',
-          contact: { id: user.id, shadowId: user.shadowId, name: user.name || 'ShadowTalk User' },
-          messages: [],
-          unreadCount: 0
-        };
-
-        let shouldIncrementUnread = true;
-        if (otherChatData.notificationType === 'Mentions Only') {
-          shouldIncrementUnread = text.includes(`@${user.shadowId || user.id}`);
-        } else if (otherChatData.notificationType === 'Mute' || (otherChatData.muteUntil && otherChatData.muteUntil > Date.now())) {
-          shouldIncrementUnread = false;
-        }
-
-        const myIdLower = user.id.toLowerCase();
-        supabase.from('chats').upsert({
-          owner_id: actualOwnerId.toLowerCase(),
-          chat_id: myIdLower,
-          chat_data: {
-            ...otherChatData,
-            status: otherChatData.status === 'deleted' ? 'direct' : otherChatData.status,
-            messages: [], // Clear message blob
-            unreadCount: shouldIncrementUnread ? (otherChatData.unreadCount || 0) + 1 : (otherChatData.unreadCount || 0),
-            lastActivity: Date.now()
-          }
-        }, { onConflict: 'owner_id, chat_id' })
-        .then(({ error }) => {
-          if (error) console.error('[ShadowTalk] Error in upsert:', error);
+              return supabase.from('chats').upsert({
+                owner_id: member.id,
+                chat_id: chatId,
+                chat_data: updatedMemberChat
+              }, { onConflict: 'owner_id, chat_id' });
+            });
         });
+        Promise.all(memberUpdates).catch(e => console.error('[ShadowTalk] Error in group member updates:', e));
       }
-    } else if (targetChat.type === 'group') {
-      for (const member of targetChat.members) {
-        if (member.id === user.id) continue;
-        const { data: memberData } = await supabase
-          .from('chats')
-          .select('chat_data')
-          .eq('owner_id', member.id)
-          .eq('chat_id', chatId)
-          .maybeSingle();
-
-        const baseChat = memberData?.chat_data || targetChat;
-        const updatedMemberChat = {
-          ...baseChat,
-          messages: [], // Keep it light
-          unreadCount: (baseChat.unreadCount || 0) + 1,
-          lastActivity: Date.now()
-        };
-
-        await supabase.from('chats').upsert({
-          owner_id: member.id,
-          chat_id: chatId,
-          chat_data: updatedMemberChat
-        }, { onConflict: 'owner_id, chat_id' });
-      }
-    }
+    });
   };
 
   const editMessage = async (chatId, messageId, newText) => {
