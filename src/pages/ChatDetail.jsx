@@ -1229,6 +1229,7 @@ export default function ChatDetail() {
       await editMessage(id, editingMessage.id, inputText);
       setEditingMessage(null);
       setInputText('');
+      if (inputRef.current) inputRef.current.style.height = '44px';
       return;
     }
 
@@ -1244,6 +1245,7 @@ export default function ChatDetail() {
       }
 
       setInputText('');
+      if (inputRef.current) inputRef.current.style.height = '44px';
       setPendingAttachments([]);
       setReplyTo(null);
       setTypingStatus(id, false);
