@@ -1034,13 +1034,21 @@ export default function ChatDetail() {
         
         if (isActuallyMe) {
           // I sent this, scroll to bottom
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          setTimeout(() => {
+            if (scrollContainerRef.current) {
+              scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
+            }
+          }, 100);
           setNewMessagesCount(0);
         } else {
           // Message from others
           if (isAtBottom) {
             // If already at bottom, scroll to bottom to show new message
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            setTimeout(() => {
+              if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
+              }
+            }, 100);
             setNewMessagesCount(0);
           } else {
             // If not at bottom, show unread count
