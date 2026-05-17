@@ -3465,6 +3465,10 @@ export default function ChatDetail() {
                 playsInline 
                 muted 
                 onLoadedMetadata={() => videoRef.current.play()}
+                onError={() => {
+                  showToast('Camera stream error', 'error');
+                  if (typeof stopCamera === 'function') stopCamera();
+                }}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             )}
@@ -3737,6 +3741,10 @@ export default function ChatDetail() {
               <img 
                 key={previewMedia.id}
                 src={previewMedia.media.url} 
+                onError={() => { 
+                  showToast('Failed to load image', 'error'); 
+                  setPreviewMedia(null); 
+                }}
                 style={{ 
                   maxWidth: '100%', maxHeight: '100vh', objectFit: 'contain', 
                   boxShadow: '0 0 50px rgba(0,0,0,0.5)',
@@ -3750,6 +3758,10 @@ export default function ChatDetail() {
                 src={previewMedia.media.url} 
                 controls 
                 autoPlay 
+                onError={() => { 
+                  showToast('Failed to load video', 'error'); 
+                  setPreviewMedia(null); 
+                }}
                 style={{ 
                   maxWidth: '100%', maxHeight: '100vh', outline: 'none',
                   animation: 'scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
