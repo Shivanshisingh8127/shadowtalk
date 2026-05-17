@@ -2259,6 +2259,74 @@ export default function ChatDetail() {
             </React.Fragment>
           );
         })}
+
+        {/* Typing Indicator */}
+        {(() => {
+          const currentTypingObj = typingUsers[id] || {};
+          const typingUserIds = Object.keys(currentTypingObj).filter(uid => currentTypingObj[uid] && uid !== user?.id);
+          
+          if (typingUserIds.length === 0) return null;
+          
+          const typingNames = typingUserIds.map(uid => {
+            if (isGroup) {
+              return (safeChat.members || []).find(m => m && (m.id === uid || m.shadowId === uid))?.name || 'Someone';
+            } else {
+              return safeChat.contact?.name || 'Someone';
+            }
+          });
+          
+          let typingText = '';
+          if (typingNames.length === 1) {
+            typingText = `${typingNames[0]} is typing...`;
+          } else if (typingNames.length === 2) {
+            typingText = `${typingNames[0]} and ${typingNames[1]} are typing...`;
+          } else if (typingNames.length > 2) {
+            typingText = 'Multiple people are typing...';
+          }
+          
+          return (
+            <div style={{ 
+              alignSelf: 'flex-start',
+              maxWidth: '85%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              width: '100%',
+              justifyContent: 'flex-start',
+              margin: '4px 0',
+              animation: 'fadeIn 0.3s ease-out'
+            }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                maxWidth: '80%'
+              }}>
+                {isGroup && (
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px', marginLeft: '12px' }}>
+                    {typingNames.join(', ')}
+                  </span>
+                )}
+                <div style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  padding: '10px 16px',
+                  borderRadius: '16px 16px 16px 4px',
+                  fontSize: '0.9rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  border: '1px solid var(--border-color)',
+                  backdropFilter: 'blur(20px)'
+                }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                    {typingText}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <div ref={messagesEndRef} style={{ height: '1px' }} />
       </div>
 
