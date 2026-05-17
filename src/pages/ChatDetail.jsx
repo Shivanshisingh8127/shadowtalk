@@ -1036,11 +1036,18 @@ export default function ChatDetail() {
           // I sent this, scroll to bottom
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
           setNewMessagesCount(0);
-        } else if (!isActuallyMe && !isAtBottom) {
-          // Accurately count how many new messages arrived (handles both real-time single and polling bulk)
-          const added = currentCount - prevCount;
-          setNewMessagesCount(prev => prev + added);
-          setShowScrollBottomBtn(true);
+        } else {
+          // Message from others
+          if (isAtBottom) {
+            // If already at bottom, scroll to bottom to show new message
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            setNewMessagesCount(0);
+          } else {
+            // If not at bottom, show unread count
+            const added = currentCount - prevCount;
+            setNewMessagesCount(prev => prev + added);
+            setShowScrollBottomBtn(true);
+          }
         }
       }
       
