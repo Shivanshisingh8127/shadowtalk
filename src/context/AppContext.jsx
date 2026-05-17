@@ -2327,7 +2327,7 @@ export const AppProvider = ({ children }) => {
     showToast(targetState ? 'Chat archived' : 'Chat unarchived');
   };
 
-  const addMessage = async (chatId, text, media = null, replyTo = null, forwardedData = null) => {
+  async function addMessage(chatId, text, media = null, replyTo = null, forwardedData = null) {
     if (!user?.id) return;
 
     // 1. Resolve IDs first so everything else can use the correct canonical database ID
