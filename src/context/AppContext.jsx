@@ -2327,7 +2327,7 @@ export const AppProvider = ({ children }) => {
     showToast(targetState ? 'Chat archived' : 'Chat unarchived');
   };
 
-  async function addMessage(chatId, text, media = null, replyTo = null, forwardedData = null) {
+  const addMessage = async (chatId, text, media = null, replyTo = null, forwardedData = null) => {
     if (!user?.id) return;
 
     // 1. Resolve IDs first so everything else can use the correct canonical database ID
@@ -2604,19 +2604,20 @@ export const AppProvider = ({ children }) => {
         }
 
         const myIdLower = user.id.toLowerCase();
-        (async () => {
-          await supabase.from('chats').upsert({
-            owner_id: actualOwnerId.toLowerCase(),
-            chat_id: myIdLower,
-            chat_data: {
-              ...otherChatData,
-              status: otherChatData.status === 'deleted' ? 'direct' : otherChatData.status,
-              messages: [], // Clear message blob
-              unreadCount: shouldIncrementUnread ? (otherChatData.unreadCount || 0) + 1 : (otherChatData.unreadCount || 0),
-              lastActivity: Date.now()
-            }
-          }, { onConflict: 'owner_id, chat_id' });
-        })().catch(e => console.error('[ShadowTalk] Error in upsert IIFE:', e));
+        supabase.from('chats').upsert({
+          owner_id: actualOwnerId.toLowerCase(),
+          chat_id: myIdLower,
+          chat_data: {
+            ...otherChatData,
+            status: otherChatData.status === 'deleted' ? 'direct' : otherChatData.status,
+            messages: [], // Clear message blob
+            unreadCount: shouldIncrementUnread ? (otherChatData.unreadCount || 0) + 1 : (otherChatData.unreadCount || 0),
+            lastActivity: Date.now()
+          }
+        }, { onConflict: 'owner_id, chat_id' })
+        .then(({ error }) => {
+          if (error) console.error('[ShadowTalk] Error in upsert:', error);
+        });
       }
     } else if (targetChat.type === 'group') {
       for (const member of targetChat.members) {
