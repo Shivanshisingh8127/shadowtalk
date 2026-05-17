@@ -110,7 +110,7 @@ export default function Chats() {
   const filteredChats = (chats || [])
     .filter(chat => {
       if (!chat) return false;
-      if (chat.status === 'deleted' && chat.type === 'group') return false;
+      if (chat.status === 'deleted') return false;
       
       const hasMessages = chat.messages && chat.messages.length > 0;
       

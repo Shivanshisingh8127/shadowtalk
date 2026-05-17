@@ -1226,6 +1226,7 @@ export const AppProvider = ({ children }) => {
 
               const newChat = {
                 ...chat,
+                status: chat.status === 'deleted' ? (chat.type === 'group' ? null : 'direct') : chat.status,
                 messages: updatedMessages,
                 lastActivity: Math.max(chat.lastActivity || 0, decryptedMsg.timestamp),
                 unreadCount: (msg.sender_id !== userRef.current?.id && idx < 0) ? (chat.unreadCount || 0) + 1 : (chat.unreadCount || 0)
@@ -3400,7 +3401,14 @@ export const AppProvider = ({ children }) => {
     const data = records?.[0];
 
     if (data?.owner_id) {
-      await supabase.from('chats').delete()
+      // Instead of deleting, mark as deleted and clear messages array
+      // This preserves clearedAt timestamp so old messages don't reappear
+      const currentChat = chatsRef.current?.find(c => c.id === chatId);
+      const updatedChatData = currentChat ? { ...currentChat, status: 'deleted', messages: [] } : { status: 'deleted', messages: [] };
+      
+      await supabase.from('chats').update({
+        chat_data: updatedChatData
+      })
         .eq('owner_id', data.owner_id)
         .eq('chat_id', chatId);
     }
