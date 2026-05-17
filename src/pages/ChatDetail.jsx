@@ -1999,7 +1999,7 @@ export default function ChatDetail() {
                       backdropFilter: 'blur(20px)',
                       border: isMine ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
                       color: isMine ? (safeChat.theme?.senderColor ? '#fff' : '#000') : '#fff',
-                      padding: '12px 16px',
+                      padding: msg.media ? '4px' : '12px 16px',
                       borderRadius: isMine ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
                       boxShadow: isMine ? (safeChat.theme?.senderColor ? `0 8px 25px ${safeChat.theme.senderColor}55` : 'var(--shadow-glow)') : '0 8px 25px rgba(0,0,0,0.3)',
                       position: 'relative',
