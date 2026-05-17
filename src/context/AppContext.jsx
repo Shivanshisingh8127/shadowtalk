@@ -1433,41 +1433,50 @@ export const AppProvider = ({ children }) => {
     chatsList.forEach(chat => {
       // Direct Chats
       if (chat.type === 'direct' && chat.messages && chat.messages.length > 0) {
-        const incomingSentMessages = chat.messages.filter(m => 
+        const incomingMessages = chat.messages.filter(m => 
           m.senderId?.toLowerCase() !== myIdLower && 
-          m.status === 'sent'
+          (m.status === 'sent' || m.status === 'delivered')
         );
         
-        incomingSentMessages.forEach(m => {
+        incomingMessages.forEach(m => {
           const isViewingThisChat = activeChatIdRef.current && (
             String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase() ||
             (chat.contact?.id && String(activeChatIdRef.current).toLowerCase() === chat.contact.id.toLowerCase()) ||
             (chat.contact?.shadowId && String(activeChatIdRef.current).toLowerCase() === chat.contact.shadowId.toLowerCase())
           );
-          const finalStatus = isViewingThisChat ? 'seen' : 'delivered';
-          const finalRead = isViewingThisChat;
           
-          const cid = chat.id.toLowerCase();
-          if (!statusMap[cid]) statusMap[cid] = { seen: [], delivered: [] };
-          statusMap[cid][finalStatus].push(m.id);
- 
-          console.log(`[ShadowTalk] Marking message ${m.id} as ${finalStatus}`);
-          const updatedContent = { ...m, status: finalStatus, read: finalRead };
-          if (finalRead && m.deleteAfterRead && !m.deleteAt) {
-            updatedContent.deleteAt = Date.now() + (m.disappearDuration || 3600000);
+          let finalStatus = m.status;
+          if (isViewingThisChat) {
+            finalStatus = 'seen';
+          } else if (m.status === 'sent') {
+            finalStatus = 'delivered';
           }
           
-          const encrypted = {
-            ...updatedContent,
-            text: encrypt(updatedContent.text, chat.id.toLowerCase()),
-            replyTo: updatedContent.replyTo ? {
-              ...updatedContent.replyTo,
-              text: encrypt(updatedContent.replyTo.text, chat.id.toLowerCase())
-            } : null
-          };
-          promises.push(
-            supabase.from('messages').update({ content: encrypted }).eq('id', m.id)
-          );
+          // Only update if status changes
+          if (finalStatus !== m.status) {
+            const finalRead = finalStatus === 'seen';
+            const cid = chat.id.toLowerCase();
+            if (!statusMap[cid]) statusMap[cid] = { seen: [], delivered: [] };
+            statusMap[cid][finalStatus].push(m.id);
+   
+            console.log(`[ShadowTalk] Marking message ${m.id} as ${finalStatus}`);
+            const updatedContent = { ...m, status: finalStatus, read: finalRead };
+            if (finalRead && m.deleteAfterRead && !m.deleteAt) {
+              updatedContent.deleteAt = Date.now() + (m.disappearDuration || 3600000);
+            }
+            
+            const encrypted = {
+              ...updatedContent,
+              text: encrypt(updatedContent.text, chat.id.toLowerCase()),
+              replyTo: updatedContent.replyTo ? {
+                ...updatedContent.replyTo,
+                text: encrypt(updatedContent.replyTo.text, chat.id.toLowerCase())
+              } : null
+            };
+            promises.push(
+              supabase.from('messages').update({ content: encrypted }).eq('id', m.id)
+            );
+          }
         });
       }
 
