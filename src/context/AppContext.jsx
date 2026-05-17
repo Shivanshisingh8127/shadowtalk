@@ -841,7 +841,7 @@ export const AppProvider = ({ children }) => {
       const msgContent = msg.content ? (typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content) : null;
       const isCallUpdate = payload.eventType === 'UPDATE' && msgContent?.type === 'call';
 
-      if ((payload.eventType === 'INSERT' || isCallUpdate) && msgContent) {
+      if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && msgContent) {
         const content = msgContent;
         const metadata = content.metadata;
 
@@ -1106,7 +1106,11 @@ export const AppProvider = ({ children }) => {
 
         // Live Ticks Auto-Seen & Auto-Delivered on INSERT
         if (payload.eventType === 'INSERT' && msg.sender_id?.toLowerCase() !== myId?.toLowerCase() && !isGroup) {
-          const activeChat = (chatsRef.current || chats || []).find(c => String(c.id).toLowerCase() === String(activeChatIdRef.current).toLowerCase());
+          const activeChat = (chatsRef.current || chats || []).find(c =>
+            String(c.id).toLowerCase() === String(activeChatIdRef.current).toLowerCase() ||
+            (c.contact?.id && String(c.contact.id).toLowerCase() === String(activeChatIdRef.current).toLowerCase()) ||
+            (c.contact?.shadowId && String(c.contact.shadowId).toLowerCase() === String(activeChatIdRef.current).toLowerCase())
+          );
           const isViewingThisChat = activeChat && (
             activeChat.id.toLowerCase() === gid ||
             (activeChat.contact?.id && activeChat.contact.id.toLowerCase() === gid) ||
@@ -2258,27 +2262,46 @@ export const AppProvider = ({ children }) => {
   const addMessage = async (chatId, text, media = null, replyTo = null, forwardedData = null) => {
     if (!user?.id) return;
 
-    // Check if user is removed from group
-    const currentChat = chats.find(c => String(c.id).toLowerCase() === String(chatId).toLowerCase());
-    const isGroup = chatId.startsWith('group_') || currentChat?.type === 'group';
-    const isParticipant = !isGroup || (
-      (currentChat?.members || []).some(m => m && (String(m.id).toLowerCase() === user.id.toLowerCase() || String(m.shadowId).toLowerCase() === String(user.shadowId).toLowerCase())) &&
-      currentChat?.status !== 'removed'
+    // 1. Resolve IDs first so everything else can use the correct canonical database ID
+    let canonicalId = chatId.toLowerCase();
+    let contactProfile = null;
+    if (!chatId.startsWith('group_')) {
+      const { data } = await supabase
+        .from('users')
+        .select('id, shadow_id, name')
+        .or(`id.eq."${chatId}",shadow_id.eq."${chatId}"`)
+        .maybeSingle();
+      if (data) {
+        contactProfile = data;
+        canonicalId = data.id.toLowerCase();
+      }
+    }
+
+    let targetChat = chats.find(c =>
+      c.id.toLowerCase() === canonicalId ||
+      (c.contact?.id && c.contact.id.toLowerCase() === canonicalId) ||
+      (c.contact?.shadowId && c.contact.shadowId.toLowerCase() === canonicalId)
     );
 
-    if (isGroup && !isParticipant && currentChat?.adminId !== user.id) {
+    const isGroup = canonicalId.startsWith('group_') || targetChat?.type === 'group';
+    const isParticipant = !isGroup || (
+      (targetChat?.members || []).some(m => m && (String(m.id).toLowerCase() === user.id.toLowerCase() || String(m.shadowId).toLowerCase() === String(user.shadowId).toLowerCase())) &&
+      targetChat?.status !== 'removed'
+    );
+
+    if (isGroup && !isParticipant && targetChat?.adminId !== user.id) {
       showToast('You are no longer a participant in this group', 'error');
       return;
     }
 
-    const isDeletedByOther = currentChat?.isDeletedByOther || currentChat?.chat_data?.isDeletedByOther;
-    const isDeletedByMe = currentChat?.status === 'deleted' || currentChat?.chat_data?.status === 'deleted';
+    const isDeletedByOther = targetChat?.isDeletedByOther || targetChat?.chat_data?.isDeletedByOther;
+    const isDeletedByMe = targetChat?.status === 'deleted' || targetChat?.chat_data?.status === 'deleted';
     const isReconnectionAttempt = isDeletedByOther && !isDeletedByMe && text === "I'd like to reconnect with you.";
-    const isBlocked = currentChat?.isBlocked || currentChat?.chat_data?.isBlocked;
-    const isBlockedByOther = currentChat?.isBlockedByOther || currentChat?.chat_data?.isBlockedByOther;
+    const isBlocked = targetChat?.isBlocked || targetChat?.chat_data?.isBlocked;
+    const isBlockedByOther = targetChat?.isBlockedByOther || targetChat?.chat_data?.isBlockedByOther;
 
-    if (isBlocked || isBlockedByOther || isDeletedByMe || (isDeletedByOther && !isReconnectionAttempt) || currentChat?.status === 'pending_sent' || currentChat?.status === 'pending_received') {
-      let msg = isRemoved ? 'You are no longer a participant in this group.' :
+    if (isBlocked || isBlockedByOther || isDeletedByMe || (isDeletedByOther && !isReconnectionAttempt) || targetChat?.status === 'pending_sent' || targetChat?.status === 'pending_received') {
+      let msg = targetChat?.status === 'removed' ? 'You are no longer a participant in this group.' :
         isBlocked ? 'You blocked this contact.' :
           isBlockedByOther ? 'You have been blocked.' :
             'This conversation is read-only.';
@@ -2288,8 +2311,7 @@ export const AppProvider = ({ children }) => {
     }
 
     // PRIVACY CHECK: If direct chat, check if the recipient has blocked us or deleted us
-    let canonicalId = (currentChat?.id || chatId).toLowerCase();
-    if (!chatId.startsWith('group_')) {
+    if (!isGroup) {
       const { data: otherData } = await supabase
         .from('chats')
         .select('chat_data')
@@ -2310,7 +2332,6 @@ export const AppProvider = ({ children }) => {
       }
     }
 
-    let targetChat = chats.find(chat => chat.id === chatId);
     const isSelf = canonicalId === user.id.toLowerCase();
     
     let isReceiverOnline = isSelf;
@@ -2319,7 +2340,8 @@ export const AppProvider = ({ children }) => {
       const contactShadowId = targetChat?.contact?.shadowId?.toLowerCase();
       isReceiverOnline = (contactId && onlineUsersRef.current?.has(contactId)) ||
                          (contactShadowId && onlineUsersRef.current?.has(contactShadowId)) ||
-                         onlineUsersRef.current?.has(canonicalId);
+                         (canonicalId && onlineUsersRef.current?.has(canonicalId)) ||
+                         (chatId && onlineUsersRef.current?.has(chatId.toLowerCase()));
     }
     
     const initialStatus = isSelf ? 'seen' : (isReceiverOnline ? 'delivered' : 'sent');
@@ -2388,16 +2410,6 @@ export const AppProvider = ({ children }) => {
         newMessage.disappearDuration = duration;
       }
     }
-
-    // Resolve IDs
-    const { data: contactProfile } = await supabase
-      .from('users')
-      .select('id, shadow_id, name')
-      .or(`id.eq."${chatId}",shadow_id.eq."${chatId}"`)
-      .maybeSingle();
-
-    canonicalId = (contactProfile?.id || chatId).toLowerCase();
-    targetChat = chats.find(c => c.id.toLowerCase() === canonicalId);
 
     // Update local state
     setChats(prev => {
@@ -2710,7 +2722,10 @@ export const AppProvider = ({ children }) => {
 
     // 1. Update local chat metadata AND message statuses to 'seen' / 'read: true'
     setChats(prev => prev.map(chat => {
-      if (chat.id.toLowerCase() === canonicalChatId) {
+      const isMatch = chat.id.toLowerCase() === canonicalChatId ||
+                      (chat.contact?.id && chat.contact.id.toLowerCase() === canonicalChatId) ||
+                      (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === canonicalChatId);
+      if (isMatch) {
         return {
           ...chat,
           unreadCount: 0,
@@ -2725,24 +2740,28 @@ export const AppProvider = ({ children }) => {
     }));
 
     // 2. Clear unreadCount in DB for me
+    const targetChat = (chatsRef.current || chats).find(c =>
+      c.id.toLowerCase() === canonicalChatId ||
+      (c.contact?.id && c.contact.id.toLowerCase() === canonicalChatId) ||
+      (c.contact?.shadowId && c.contact.shadowId.toLowerCase() === canonicalChatId)
+    );
+    if (!targetChat) return;
+
+    const actualChatId = targetChat.id.toLowerCase();
     const { data: myData } = await supabase
       .from('chats')
       .select('chat_data, owner_id')
       .or(`owner_id.eq."${user.id}",owner_id.eq."${user.shadowId}"`)
-      .eq('chat_id', chatId)
+      .eq('chat_id', actualChatId)
       .maybeSingle();
 
     if (myData?.chat_data) {
       await supabase.from('chats').upsert({
         owner_id: myData.owner_id || user.id,
-        chat_id: chatId,
+        chat_id: actualChatId,
         chat_data: { ...myData.chat_data, unreadCount: 0, messages: [] } // keep it light
       }, { onConflict: 'owner_id, chat_id' });
     }
-
-    // 3. Find unread messages from local state and UPDATE the atomic messages table
-    const targetChat = (chatsRef.current || chats).find(c => c.id.toLowerCase() === canonicalChatId);
-    if (!targetChat) return;
 
     const unreadMessages = (targetChat.messages || []).filter(m => m.senderId?.toLowerCase() !== user.id.toLowerCase() && !m.read);
     if (unreadMessages.length === 0) return;
@@ -2774,10 +2793,10 @@ export const AppProvider = ({ children }) => {
 
       const dbContent = {
         ...updatedContent,
-        text: encrypt(updatedContent.text, canonicalChatId),
+        text: encrypt(updatedContent.text, actualChatId),
         replyTo: updatedContent.replyTo ? {
           ...updatedContent.replyTo,
-          text: encrypt(updatedContent.replyTo.text, canonicalChatId)
+          text: encrypt(updatedContent.replyTo.text, actualChatId)
         } : null
       };
 
