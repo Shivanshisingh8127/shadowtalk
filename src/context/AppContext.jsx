@@ -2618,7 +2618,7 @@ export const AppProvider = ({ children }) => {
                     chat_data: {
                       ...otherChatData,
                       status: otherChatData.status === 'deleted' ? 'direct' : otherChatData.status,
-                      messages: [], // Clear message blob
+                      messages: [newMessage], // Store the last message for dashboard snippet
                       unreadCount: shouldIncrementUnread ? (otherChatData.unreadCount || 0) + 1 : (otherChatData.unreadCount || 0),
                       lastActivity: Date.now()
                     }
