@@ -2604,17 +2604,19 @@ export const AppProvider = ({ children }) => {
         }
 
         const myIdLower = user.id.toLowerCase();
-        await supabase.from('chats').upsert({
-          owner_id: actualOwnerId.toLowerCase(),
-          chat_id: myIdLower,
-          chat_data: {
-            ...otherChatData,
-            status: otherChatData.status === 'deleted' ? 'direct' : otherChatData.status,
-            messages: [], // Clear message blob
-            unreadCount: shouldIncrementUnread ? (otherChatData.unreadCount || 0) + 1 : (otherChatData.unreadCount || 0),
-            lastActivity: Date.now()
-          }
-        }, { onConflict: 'owner_id, chat_id' });
+        (async () => {
+          await supabase.from('chats').upsert({
+            owner_id: actualOwnerId.toLowerCase(),
+            chat_id: myIdLower,
+            chat_data: {
+              ...otherChatData,
+              status: otherChatData.status === 'deleted' ? 'direct' : otherChatData.status,
+              messages: [], // Clear message blob
+              unreadCount: shouldIncrementUnread ? (otherChatData.unreadCount || 0) + 1 : (otherChatData.unreadCount || 0),
+              lastActivity: Date.now()
+            }
+          }, { onConflict: 'owner_id, chat_id' });
+        })().catch(e => console.error('[ShadowTalk] Error in upsert IIFE:', e));
       }
     } else if (targetChat.type === 'group') {
       for (const member of targetChat.members) {
