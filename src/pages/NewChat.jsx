@@ -7,7 +7,8 @@ import {
   QrCode,
   Share2,
   Copy,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../supabaseClient';
@@ -537,6 +538,43 @@ export default function NewChat() {
           </div>
         )}
       </div>
+
+      {isSearching && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 10000,
+        }}>
+          <div className="glass-box" style={{
+            padding: '32px',
+            borderRadius: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            maxWidth: '320px',
+            width: '90%',
+            textAlign: 'center'
+          }}>
+            <Loader2 size={36} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+            <div>
+              <h3 style={{ color: '#fff', fontSize: '1.2rem', fontWeight: 600, marginBottom: '8px' }}>Processing</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.4' }}>
+                Please wait while we process your request. This may take a few seconds.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
