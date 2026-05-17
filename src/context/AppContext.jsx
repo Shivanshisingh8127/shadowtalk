@@ -240,24 +240,6 @@ export const AppProvider = ({ children }) => {
     supabase.auth.getSession().then(({ data }) => {
       const token = data?.session?.access_token || user.id;
       // Ensure we use HTTPS for signaling in production to avoid security warnings/red pages
-      let signalingUrl = import.meta.env.VITE_SIGNALING_SERVER_URL;
-      if (!signalingUrl && window.location.hostname !== 'localhost') {
-        const hostname = window.location.hostname;
-        console.log('[ShadowTalk] No signaling URL provided, attempting automatic discovery for:', hostname);
-        if (hostname.endsWith('.onrender.com')) {
-          // Try to find the signaling server by assuming it's a separate Render service
-          // if the current app is 'my-app.onrender.com', try 'my-app-signaling.onrender.com'
-          // or if it contains 'session', replace with 'signaling'
-          if (hostname.includes('session')) {
-            signalingUrl = `https://${hostname.replace('session', 'signaling')}`;
-          } else {
-            signalingUrl = `https://${hostname.replace('.onrender.com', '-signaling.onrender.com')}`;
-          }
-        } else {
-          signalingUrl = window.location.origin;
-        }
-      }
-      console.log('[ShadowTalk] Initializing signaling at:', signalingUrl || 'http://localhost:3001');
       callService.setEncryptor(encrypt);
       callService.initialize(user.id, user.shadowId);
     });
