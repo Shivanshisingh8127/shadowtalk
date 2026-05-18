@@ -176,6 +176,12 @@ export const AppProvider = ({ children }) => {
   }, [settings]);
 
   useEffect(() => {
+    if (user?.id) {
+      localStorage.setItem(`shadowtalk_chats_${user.id.toLowerCase()}`, JSON.stringify(chats));
+    }
+  }, [chats, user?.id]);
+
+  useEffect(() => {
     if (!settings.typingIndicators) {
       setTypingUsers({});
     }
@@ -189,6 +195,11 @@ export const AppProvider = ({ children }) => {
         if (storedUser) {
           const u = JSON.parse(storedUser);
           if (u && u.id) {
+            // Load cached chats first for immediate UI restore
+            const cachedChats = localStorage.getItem(`shadowtalk_chats_${u.id.toLowerCase()}`);
+            if (cachedChats) {
+              setChats(JSON.parse(cachedChats));
+            }
             await loginMockUser(u.name, u.id, u.phrase);
           }
         }
@@ -1260,7 +1271,7 @@ export const AppProvider = ({ children }) => {
     if (!user?.id) return;
 
     const interval = setInterval(() => {
-      if (userRef.current) {
+      if (userRef.current && navigator.onLine) {
         loginMockUser(userRef.current.name, userRef.current.id, userRef.current.phrase, true);
       }
     }, 30000); // Check every 30 seconds instead of 5s
@@ -1584,6 +1595,18 @@ export const AppProvider = ({ children }) => {
     if (!silent) setIsLoading(true);
     const inputId = customId || '';
     try {
+      if (!navigator.onLine) {
+        console.log('[ShadowTalk] Offline mode detected in loginMockUser');
+        const storedUser = localStorage.getItem('shadowtalk_user');
+        if (storedUser) {
+          const u = JSON.parse(storedUser);
+          if (u && (u.id === inputId || u.shadowId === inputId)) {
+            setUser(u);
+            setIsLoading(false);
+            return true;
+          }
+        }
+      }
       // Search by DB id OR shadow_id OR name to be flexible
       const { data, error } = await supabase
         .from('users')
