@@ -1497,6 +1497,10 @@ export default function ChatDetail() {
                     <span style={{ fontSize: '0.75rem', color: '#4ECCA3', fontWeight: 600 }}>
                       online
                     </span>
+                  ) : (!isGroup && safeChat.contact?.lastSeen && !isReadOnly && !isNoteToSelf) ? (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      last seen {new Date(safeChat.contact.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   ) : null}
                 </div>
               </div>

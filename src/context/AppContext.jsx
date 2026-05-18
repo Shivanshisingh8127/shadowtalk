@@ -106,16 +106,92 @@ export const AppProvider = ({ children }) => {
           return chat;
         }));
       })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await presenceChannel.track({
-            online_at: new Date().toISOString(),
-            shadowId: user.shadowId?.toLowerCase()
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        console.log('[ShadowTalk] Presence Leave for key:', key, leftPresences);
+        if (!user?.id) return;
+        const myIdLower = user.id.toLowerCase();
+        
+        if (key.toLowerCase() !== myIdLower) {
+          const lastSeenTime = Date.now();
+          
+          setChats(prev => prev.map(chat => {
+            if (chat.type === 'direct' && chat.contact) {
+              const contactIdLower = chat.contact.id?.toLowerCase();
+              const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+              const isMatch = (contactIdLower === key.toLowerCase()) ||
+                              (contactShadowIdLower === key.toLowerCase());
+              
+              if (isMatch) {
+                return {
+                  ...chat,
+                  contact: { ...chat.contact, isOnline: false, lastSeen: lastSeenTime }
+                };
+              }
+            }
+            return chat;
+          }));
+
+          const currentChats = chatsRef.current || [];
+          const targetChat = currentChats.find(chat => {
+            if (chat.type === 'direct' && chat.contact) {
+              const contactIdLower = chat.contact.id?.toLowerCase();
+              const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+              return (contactIdLower === key.toLowerCase()) || (contactShadowIdLower === key.toLowerCase());
+            }
+            return false;
           });
+
+          if (targetChat) {
+            const updatedChatData = { ...targetChat, lastSeen: lastSeenTime };
+            supabase.from('chats').upsert({
+              owner_id: myIdLower,
+              chat_id: targetChat.id.toLowerCase(),
+              chat_data: updatedChatData
+            }, { onConflict: 'owner_id, chat_id' })
+            .then(({ error }) => {
+              if (error) console.error('[ShadowTalk] Error saving last seen:', error);
+            });
+          }
         }
       });
 
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'hidden') {
+        await presenceChannel.untrack();
+      } else {
+        await presenceChannel.track({
+          online_at: new Date().toISOString(),
+          shadowId: user.shadowId?.toLowerCase()
+        });
+      }
+    };
+    const handleBlur = async () => {
+      await presenceChannel.untrack();
+    };
+    const handleFocus = async () => {
+      await presenceChannel.track({
+        online_at: new Date().toISOString(),
+        shadowId: user.shadowId?.toLowerCase()
+      });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+
+    presenceChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await presenceChannel.track({
+          online_at: new Date().toISOString(),
+          shadowId: user.shadowId?.toLowerCase()
+        });
+      }
+    });
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
       presenceChannel.unsubscribe();
     };
   }, [user?.id]);
