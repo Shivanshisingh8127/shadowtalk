@@ -2515,17 +2515,7 @@ export const AppProvider = ({ children }) => {
 
     const isSelf = canonicalId === user.id.toLowerCase();
     
-    let isReceiverOnline = isSelf;
-    if (!isReceiverOnline) {
-      const contactId = targetChat?.contact?.id?.toLowerCase();
-      const contactShadowId = targetChat?.contact?.shadowId?.toLowerCase();
-      isReceiverOnline = (contactId && onlineUsersRef.current?.has(contactId)) ||
-                         (contactShadowId && onlineUsersRef.current?.has(contactShadowId)) ||
-                         (canonicalId && onlineUsersRef.current?.has(canonicalId)) ||
-                         (chatId && onlineUsersRef.current?.has(chatId.toLowerCase()));
-    }
-    
-    const initialStatus = isSelf ? 'seen' : (isReceiverOnline ? 'delivered' : 'sent');
+    const initialStatus = isSelf ? 'seen' : 'sent';
     const initialRead = isSelf;
 
     const newMessage = {
