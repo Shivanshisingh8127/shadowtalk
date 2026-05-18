@@ -230,6 +230,7 @@ export const AppProvider = ({ children }) => {
 
   // Real-time Presence Tracking
   const presenceChannelRef = useRef(null);
+  const offlineTimeoutRef = useRef({});
 
   useEffect(() => {
     if (!user?.id) return;
@@ -267,6 +268,16 @@ export const AppProvider = ({ children }) => {
               });
             }
           });
+
+          // Clear any pending offline timeouts for users who are currently active/online
+          activeIds.forEach(id => {
+            const lowerId = id.toLowerCase();
+            if (offlineTimeoutRef.current[lowerId]) {
+              clearTimeout(offlineTimeoutRef.current[lowerId]);
+              delete offlineTimeoutRef.current[lowerId];
+            }
+          });
+
           console.log('[ShadowTalk] Presence Sync - active user IDs:', Array.from(activeIds));
           setOnlineUsers(activeIds);
 
@@ -292,53 +303,65 @@ export const AppProvider = ({ children }) => {
           const myIdLower = user.id.toLowerCase();
           
           if (key.toLowerCase() !== myIdLower) {
-            const lastSeenTime = Date.now();
+            const keyLower = key.toLowerCase();
             
-            setChats(prev => prev.map(chat => {
-              if (chat.type === 'direct' && chat.contact) {
-                const contactIdLower = chat.contact.id?.toLowerCase();
-                const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
-                const isMatch = (contactIdLower === key.toLowerCase()) ||
-                                (contactShadowIdLower === key.toLowerCase());
-                
-                if (isMatch) {
-                  return {
-                    ...chat,
-                    contact: { ...chat.contact, isOnline: false, lastSeen: lastSeenTime }
-                  };
-                }
-              }
-              return chat;
-            }));
-
-            const currentChats = chatsRef.current || [];
-            const targetChat = currentChats.find(chat => {
-              if (chat.type === 'direct' && chat.contact) {
-                const contactIdLower = chat.contact.id?.toLowerCase();
-                const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
-                return (contactIdLower === key.toLowerCase()) || (contactShadowIdLower === key.toLowerCase());
-              }
-              return false;
-            });
-
-            if (targetChat) {
-              const updatedChatData = {
-                ...targetChat,
-                contact: {
-                  ...targetChat.contact,
-                  isOnline: false,
-                  lastSeen: lastSeenTime
-                }
-              };
-              supabase.from('chats').upsert({
-                owner_id: myIdLower,
-                chat_id: targetChat.id.toLowerCase(),
-                chat_data: updatedChatData
-              }, { onConflict: 'owner_id, chat_id' })
-              .then(({ error }) => {
-                if (error) console.error('[ShadowTalk] Error saving last seen:', error);
-              });
+            // Clear any existing leave timeout for this user
+            if (offlineTimeoutRef.current[keyLower]) {
+              clearTimeout(offlineTimeoutRef.current[keyLower]);
             }
+            
+            // Debounce offline updates by 3 seconds to eliminate network fluctuation
+            offlineTimeoutRef.current[keyLower] = setTimeout(() => {
+              const lastSeenTime = Date.now();
+              
+              setChats(prev => prev.map(chat => {
+                if (chat.type === 'direct' && chat.contact) {
+                  const contactIdLower = chat.contact.id?.toLowerCase();
+                  const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+                  const isMatch = (contactIdLower === keyLower) ||
+                                  (contactShadowIdLower === keyLower);
+                  
+                  if (isMatch) {
+                    return {
+                      ...chat,
+                      contact: { ...chat.contact, isOnline: false, lastSeen: lastSeenTime }
+                    };
+                  }
+                }
+                return chat;
+              }));
+
+              const currentChats = chatsRef.current || [];
+              const targetChat = currentChats.find(chat => {
+                if (chat.type === 'direct' && chat.contact) {
+                  const contactIdLower = chat.contact.id?.toLowerCase();
+                  const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+                  return (contactIdLower === keyLower) || (contactShadowIdLower === keyLower);
+                }
+                return false;
+              });
+
+              if (targetChat) {
+                const updatedChatData = {
+                  ...targetChat,
+                  contact: {
+                    ...targetChat.contact,
+                    isOnline: false,
+                    lastSeen: lastSeenTime
+                  }
+                };
+                supabase.from('chats').upsert({
+                  owner_id: myIdLower,
+                  chat_id: targetChat.id.toLowerCase(),
+                  chat_data: updatedChatData
+                }, { onConflict: 'owner_id, chat_id' })
+                .then(({ error }) => {
+                  if (error) console.error('[ShadowTalk] Error saving last seen:', error);
+                });
+              }
+              
+              delete offlineTimeoutRef.current[keyLower];
+            }, 3000);
           }
         });
 
