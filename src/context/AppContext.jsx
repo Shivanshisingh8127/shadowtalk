@@ -142,7 +142,7 @@ export const AppProvider = ({ children }) => {
           });
 
           if (targetChat) {
-            const updatedChatData = { ...targetChat, lastSeen: lastSeenTime };
+            const updatedChatData = { ...targetChat, lastSeen: lastSeenTime, messages: [] };
             supabase.from('chats').upsert({
               owner_id: myIdLower,
               chat_id: targetChat.id.toLowerCase(),
