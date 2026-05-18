@@ -169,6 +169,28 @@ export const AppProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
+  const playNotificationSound = () => {
+    try {
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(880, context.currentTime);
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+
+      gainNode.gain.setValueAtTime(0, context.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.5, context.currentTime + 0.05);
+      gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.3);
+
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.3);
+    } catch (e) {
+      console.warn('[ShadowTalk] Failed to play sound:', e);
+    }
+  };
+
   // Persistence effects
   useEffect(() => {
     if (user) {
@@ -369,28 +391,6 @@ export const AppProvider = ({ children }) => {
         }
       });
 
-      const playNotificationSound = () => {
-        try {
-          const context = new (window.AudioContext || window.webkitAudioContext)();
-          const oscillator = context.createOscillator();
-          const gainNode = context.createGain();
-
-          oscillator.type = 'sine';
-          oscillator.frequency.setValueAtTime(880, context.currentTime);
-          oscillator.connect(gainNode);
-          gainNode.connect(context.destination);
-
-          gainNode.gain.setValueAtTime(0, context.currentTime);
-          gainNode.gain.linearRampToValueAtTime(0.5, context.currentTime + 0.05);
-          gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.3);
-
-          oscillator.start(context.currentTime);
-          oscillator.stop(context.currentTime + 0.3);
-        } catch (e) {
-          console.warn('[ShadowTalk] Failed to play sound:', e);
-        }
-      };
-
       messaging.onMessage((payload) => {
         console.log('[ShadowTalk] Message received in foreground: ', payload);
         playNotificationSound();
@@ -398,6 +398,20 @@ export const AppProvider = ({ children }) => {
       });
     }
   }, [user?.id]);
+
+  // Listen for Service Worker messages (sound ping)
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      const handleMessage = (event) => {
+        if (event.data && event.data.type === 'PLAY_SOUND') {
+          console.log('[ShadowTalk] Received sound ping from SW');
+          playNotificationSound();
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+      return () => navigator.serviceWorker.removeEventListener('message', handleMessage);
+    }
+  }, []);
 
   // Real-time subscriptions
   useEffect(() => {
