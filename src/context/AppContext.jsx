@@ -475,6 +475,7 @@ export const AppProvider = ({ children }) => {
               return [...prev, decodedChat];
             }
           });
+          markIncomingMessagesAsDelivered([decodedChat], userRef.current?.id);
         }
       } else if (payload.eventType === 'DELETE') {
         setChats(prev => prev.filter(c =>
@@ -4183,7 +4184,11 @@ export const AppProvider = ({ children }) => {
     console.log('[ShadowTalk] Syncing missed messages...');
 
     const currentChats = chatsRef.current || [];
-    for (const chat of currentChats) {
+    let updatedChats = [...currentChats];
+    let anyNewMsgs = false;
+
+    for (let i = 0; i < updatedChats.length; i++) {
+      const chat = updatedChats[i];
       const lastMsg = chat.messages?.[chat.messages.length - 1];
       const lastTimestamp = lastMsg?.timestamp || 0;
 
@@ -4201,29 +4206,35 @@ export const AppProvider = ({ children }) => {
 
       if (newMsgs && newMsgs.length > 0) {
         console.log(`[ShadowTalk] Found ${newMsgs.length} missed messages for chat ${chat.id}`);
-        setChats(prev => prev.map(c => {
-          if (c.id.toLowerCase() === chat.id.toLowerCase()) {
-            const existingIds = new Set(c.messages?.map(m => m.id) || []);
-            const filteredNewMsgs = newMsgs
-              .filter(m => !existingIds.has(m.id))
-              .map(m => {
-                const content = m.content;
-                return {
-                  ...content,
-                  id: m.id,
-                  text: decrypt(content.text, chat.id),
-                  timestamp: new Date(m.created_at).getTime()
-                };
-              });
+        anyNewMsgs = true;
+        
+        const existingIds = new Set(chat.messages?.map(m => m.id) || []);
+        const filteredNewMsgs = newMsgs
+          .filter(m => !existingIds.has(m.id))
+          .map(m => {
+            const content = m.content;
+            return {
+              ...content,
+              id: m.id,
+              text: decrypt(content.text, chat.id),
+              timestamp: new Date(m.created_at).getTime()
+            };
+          });
 
-            const mergedMsgs = [...(c.messages || []), ...filteredNewMsgs];
-            mergedMsgs.sort((a, b) => a.timestamp - b.timestamp);
+        const mergedMsgs = [...(chat.messages || []), ...filteredNewMsgs];
+        mergedMsgs.sort((a, b) => a.timestamp - b.timestamp);
 
-            return { ...c, messages: mergedMsgs, lastActivity: Math.max(c.lastActivity || 0, mergedMsgs[mergedMsgs.length - 1]?.timestamp || 0) };
-          }
-          return c;
-        }));
+        updatedChats[i] = { 
+          ...chat, 
+          messages: mergedMsgs, 
+          lastActivity: Math.max(chat.lastActivity || 0, mergedMsgs[mergedMsgs.length - 1]?.timestamp || 0) 
+        };
       }
+    }
+
+    if (anyNewMsgs) {
+      setChats(updatedChats);
+      markIncomingMessagesAsDelivered(updatedChats, user.id);
     }
   };
 
