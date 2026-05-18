@@ -1685,7 +1685,7 @@ export const AppProvider = ({ children }) => {
 
   const loginMockUser = async (customName, customId, customPhrase, silent = false) => {
     if (!silent) setIsLoading(true);
-    const inputId = customId || '';
+    const inputId = (customId || '').trim().toLowerCase();
     try {
       if (!navigator.onLine) {
         console.log('[ShadowTalk] Offline mode detected in loginMockUser');

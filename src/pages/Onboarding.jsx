@@ -47,11 +47,11 @@ export default function Onboarding() {
     
     setIsVerifying(true);
       try {
-        // CheckIcon if input is either id or shadow_id
+        const searchId = recoverIds.userId.trim().toLowerCase();
         const { data, error } = await supabase
           .from('users')
           .select('*')
-          .or(`id.eq."${recoverIds.userId}",shadow_id.eq."${recoverIds.userId}"`)
+          .or(`id.eq."${searchId}",shadow_id.eq."${searchId}"`)
           .maybeSingle();
 
         if (error || !data) {
@@ -61,7 +61,8 @@ export default function Onboarding() {
         }
 
         // Now verify the recovery key or shadow_id matches
-        const keyMatch = data.recovery_key === recoverIds.shadowId || data.shadow_id === recoverIds.shadowId;
+        const inputKey = recoverIds.shadowId.trim().toLowerCase();
+        const keyMatch = data.recovery_key === inputKey || data.shadow_id === inputKey;
 
         if (!keyMatch) {
           showToast('Invalid Recovery Key or Shadow ID', 'error');
