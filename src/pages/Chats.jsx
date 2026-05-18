@@ -77,7 +77,8 @@ export default function Chats() {
     isLoading,
     inviteFriend,
     archiveChat,
-    typingUsers
+    typingUsers,
+    onlineUsers
   } = useAppContext();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -511,6 +512,12 @@ export default function Chats() {
               (c.members || []).some(m => m && (String(m.id).toLowerCase() === String(user?.id).toLowerCase() || String(m.shadowId).toLowerCase() === String(user?.shadowId).toLowerCase()))
             );
             
+            const contactId = chat.contact?.id?.toLowerCase();
+            const contactShadowId = chat.contact?.shadowId?.toLowerCase();
+            const isContactOnline = chat.contact?.isOnline || 
+              (contactId && onlineUsers && onlineUsers.has(contactId)) || 
+              (contactShadowId && onlineUsers && onlineUsers.has(contactShadowId));
+            
             return (
               <div 
                 key={chat.id} 
@@ -540,7 +547,7 @@ export default function Chats() {
                   ) : (
                     <DefaultAvatar name={name} />
                   )}
-                  {!isGroup && chat.contact?.isOnline && !isPendingReceived && !chat.isBlocked && !chat.isBlockedByOther && <div className="avatar-online" />}
+                  {!isGroup && isContactOnline && !isPendingReceived && !chat.isBlocked && !chat.isBlockedByOther && <div className="avatar-online" />}
                   {isPendingReceived && <div style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: 'var(--accent-primary)', borderRadius: '50%', padding: '2px', color: '#000' }}><UserPlusIcon size={12} /></div>}
                 </div>
                 

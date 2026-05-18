@@ -93,7 +93,7 @@ export default function ChatDetail() {
     settings, startCall, isLoading, updateChatSettings, updateGroupSettings, loginMockUser, decrypt, acceptRequest, rejectRequest,
     blockContact, unblockContact, inviteFriend, broadcastProfileUpdate, downloadFile,
     forwardMessage, toggleStarMessage, togglePinMessage, archiveChat, setTypingStatus, typingUsers,
-    updateChatTheme, showConfirm, setActiveChatId
+    updateChatTheme, showConfirm, setActiveChatId, syncContactsLastSeen, onlineUsers
   } = useAppContext();
   const searchParams = new URLSearchParams(location.search);
   const initialSearchMode = searchParams.get('search') === 'true';
@@ -316,6 +316,10 @@ export default function ChatDetail() {
 
   useEffect(() => {
     if (!isGroup && otherId && user?.id) {
+      if (syncContactsLastSeen && chats && chats.length > 0) {
+        syncContactsLastSeen(chats);
+      }
+      
       const checkStatus = async () => {
         // Check requests table for rejection
         const { data: reqData } = await supabase.from('requests')
@@ -362,6 +366,29 @@ export default function ChatDetail() {
             }
             return c;
           }));
+        }
+
+        // Fetch other user's self-chat to get their fresh global lastSeen
+        const { data: selfChatData } = await supabase.from('chats')
+          .select('chat_data')
+          .eq('owner_id', otherId)
+          .eq('chat_id', otherId)
+          .maybeSingle();
+
+        if (selfChatData?.chat_data?.contact) {
+          const freshLastSeen = selfChatData.chat_data.contact.lastSeen || selfChatData.chat_data.lastActivity;
+          if (freshLastSeen) {
+            setChats(prev => prev.map(c => {
+              const isMatch = c.id === id || c.id === otherId;
+              if (isMatch && c.contact && c.contact.lastSeen !== freshLastSeen) {
+                return {
+                  ...c,
+                  contact: { ...c.contact, lastSeen: freshLastSeen }
+                };
+              }
+              return c;
+            }));
+          }
         }
       };
       checkStatus();
@@ -1338,6 +1365,15 @@ export default function ChatDetail() {
     }
   };
 
+  const isContactOnline = (() => {
+    if (safeChat.contact?.isOnline) return true;
+    if (!onlineUsers || !id) return false;
+    const idLower = id.toLowerCase();
+    if (onlineUsers.has(idLower)) return true;
+    if (safeChat.contact?.shadowId && onlineUsers.has(safeChat.contact.shadowId.toLowerCase())) return true;
+    return false;
+  })();
+
   try {
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)', overflow: 'hidden', position: 'relative' }}>
@@ -1493,7 +1529,7 @@ export default function ChatDetail() {
                     <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600, animation: 'pulse 1.5s infinite' }}>
                       typing...
                     </span>
-                  ) : (!isGroup && safeChat.contact?.isOnline && !isReadOnly && !isNoteToSelf) ? (
+                  ) : (!isGroup && isContactOnline && !isReadOnly && !isNoteToSelf) ? (
                     <span style={{ fontSize: '0.75rem', color: '#4ECCA3', fontWeight: 600 }}>
                       online
                     </span>

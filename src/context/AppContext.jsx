@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase, supabaseUrl, supabaseAnonKey } from '../supabaseClient';
 import { Download as DownloadIcon } from 'lucide-react';
 import { callService } from '../modules/calling/CallService';
 import { useCallStore } from '../modules/calling/store';
@@ -43,7 +43,23 @@ export const AppProvider = ({ children }) => {
   const userRef = useRef(user);
   const lastSyncRef = useRef(0);
   useEffect(() => { chatsRef.current = chats; }, [chats]);
-  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { 
+    userRef.current = user; 
+    if (user?.id) {
+      if ('caches' in window) {
+        caches.open('shadowtalk-user').then(cache => {
+          cache.put('/user-id', new Response(user.id.toLowerCase()));
+          console.log('[ShadowTalk] Cached active user ID for background service worker:', user.id);
+        }).catch(err => console.warn('[ShadowTalk] Cache update failed:', err));
+      }
+    } else {
+      if ('caches' in window) {
+        caches.delete('shadowtalk-user').then(() => {
+          console.log('[ShadowTalk] Cleared cached user ID on logout');
+        }).catch(err => console.warn('[ShadowTalk] Cache clear failed:', err));
+      }
+    }
+  }, [user]);
 
   const [requests, setRequests] = useState([]);
   const chatSubRef = useRef(null);
@@ -60,14 +76,189 @@ export const AppProvider = ({ children }) => {
   const onlineUsersRef = useRef(new Set());
   useEffect(() => { onlineUsersRef.current = onlineUsers; }, [onlineUsers]);
 
+  // Helper to update our own self presence globally (Note to Self chat)
+  const updateSelfPresence = async (isClosing = false) => {
+    if (!userRef.current?.id) return;
+    const myIdLower = userRef.current.id.toLowerCase();
+    const lastSeenTime = Date.now();
+    
+    // Find our own self-chat in our local chats list
+    const currentChats = chatsRef.current || [];
+    const localSelfChat = currentChats.find(c => c && c.owner_id === myIdLower && c.chat_id === myIdLower);
+    
+    let selfChat = null;
+    if (localSelfChat && localSelfChat.chat_data) {
+      selfChat = JSON.parse(JSON.stringify(localSelfChat.chat_data));
+    }
+    
+    if (!selfChat) {
+      selfChat = {
+        id: myIdLower,
+        type: 'direct',
+        status: 'direct',
+        contact: {
+          id: myIdLower,
+          name: userRef.current.name,
+          shadowId: userRef.current.shadowId,
+          avatarUrl: userRef.current.avatarUrl || null
+        },
+        messages: [],
+        lastActivity: lastSeenTime
+      };
+    }
+    
+    if (!selfChat.contact) selfChat.contact = {};
+    selfChat.contact.lastSeen = lastSeenTime;
+    selfChat.lastActivity = lastSeenTime;
+    
+    // Update local state immediately so local UI displays correctly
+    setChats(prev => prev.map(c => {
+      if (c.owner_id === myIdLower && c.chat_id === myIdLower) {
+        return {
+          ...c,
+          chat_data: selfChat
+        };
+      }
+      return c;
+    }));
+    
+    // Update database
+    if (isClosing) {
+      const url = `${supabaseUrl}/rest/v1/chats`;
+      const payload = {
+        owner_id: myIdLower,
+        chat_id: myIdLower,
+        chat_data: selfChat
+      };
+      
+      try {
+        console.log('[ShadowTalk] Sending closing self presence update via native keepalive fetch...');
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(payload),
+          keepalive: true
+        });
+      } catch (err) {
+        console.warn('[ShadowTalk] Keepalive presence update failed:', err);
+      }
+    } else {
+      try {
+        await supabase.from('chats').upsert({
+          owner_id: myIdLower,
+          chat_id: myIdLower,
+          chat_data: selfChat
+        }, { onConflict: 'owner_id, chat_id' });
+        console.log('[ShadowTalk] Self presence updated globally:', lastSeenTime);
+      } catch (err) {
+        console.warn('[ShadowTalk] standard presence update failed:', err);
+      }
+    }
+  };
+
+  // Helper to fetch the latest global lastSeen values of all direct contacts
+  const syncContactsLastSeen = async (currentChatsList) => {
+    if (!userRef.current?.id || !currentChatsList || currentChatsList.length === 0) return;
+    const myIdLower = userRef.current.id.toLowerCase();
+    
+    const directChats = currentChatsList.filter(c => c && c.type === 'direct' && c.id?.toLowerCase() !== myIdLower);
+    if (directChats.length === 0) return;
+    
+    const contactIds = directChats.map(c => (c.contact?.id || c.id).toLowerCase());
+    
+    try {
+      console.log('[ShadowTalk] Background-syncing lastSeen for contacts:', contactIds);
+      
+      const { data: selfChats, error } = await supabase
+        .from('chats')
+        .select('owner_id, chat_id, chat_data')
+        .in('owner_id', contactIds)
+        .in('chat_id', contactIds);
+        
+      if (error || !selfChats) {
+        console.warn('[ShadowTalk] Failed to fetch self-chats for lastSeen:', error);
+        return;
+      }
+      
+      const lastSeenMap = {};
+      selfChats.forEach(row => {
+        if (row.owner_id && row.chat_id && row.owner_id.toLowerCase() === row.chat_id.toLowerCase()) {
+          const freshLastSeen = row.chat_data?.contact?.lastSeen || row.chat_data?.lastActivity;
+          if (freshLastSeen) {
+            lastSeenMap[row.owner_id.toLowerCase()] = freshLastSeen;
+          }
+        }
+      });
+      
+      setChats(prev => {
+        let changed = false;
+        const updated = prev.map(chat => {
+          if (chat.type === 'direct' && chat.contact) {
+            const cId = (chat.contact.id || chat.id)?.toLowerCase();
+            const freshLastSeen = lastSeenMap[cId];
+            
+            // Fallback: Check last message timestamp sent by them
+            let bestLastSeen = freshLastSeen || chat.contact.lastSeen || 0;
+            if (chat.messages && chat.messages.length > 0) {
+              chat.messages.forEach(msg => {
+                if (msg.senderId && msg.senderId.toLowerCase() === cId) {
+                  if (msg.timestamp > bestLastSeen) {
+                    bestLastSeen = msg.timestamp;
+                  }
+                }
+              });
+            }
+            
+            if (bestLastSeen > 0 && chat.contact.lastSeen !== bestLastSeen) {
+              changed = true;
+              
+              const updatedChatData = {
+                ...chat,
+                contact: {
+                  ...chat.contact,
+                  lastSeen: bestLastSeen
+                }
+              };
+              
+              supabase.from('chats').upsert({
+                owner_id: myIdLower,
+                chat_id: cId,
+                chat_data: updatedChatData
+              }, { onConflict: 'owner_id, chat_id' }).then();
+              
+              return updatedChatData;
+            }
+          }
+          return chat;
+        });
+        
+        return changed ? updated : prev;
+      });
+    } catch (err) {
+      console.warn('[ShadowTalk] syncContactsLastSeen failed:', err);
+    }
+  };
+
   // Real-time Presence Tracking
   const presenceChannelRef = useRef(null);
+  const offlineTimeoutRef = useRef({});
 
   useEffect(() => {
     if (!user?.id) return;
     const myIdLower = user.id.toLowerCase();
 
     const initPresence = () => {
+      // Connect socket if disconnected
+      if (supabase.realtime && typeof supabase.realtime.connect === 'function') {
+        console.log('[ShadowTalk] Connecting realtime socket...');
+        supabase.realtime.connect();
+      }
+
       if (presenceChannelRef.current) return;
       console.log('[ShadowTalk] Initializing Presence Channel');
       
@@ -93,6 +284,16 @@ export const AppProvider = ({ children }) => {
               });
             }
           });
+
+          // Clear any pending offline timeouts for users who are currently active/online
+          activeIds.forEach(id => {
+            const lowerId = id.toLowerCase();
+            if (offlineTimeoutRef.current[lowerId]) {
+              clearTimeout(offlineTimeoutRef.current[lowerId]);
+              delete offlineTimeoutRef.current[lowerId];
+            }
+          });
+
           console.log('[ShadowTalk] Presence Sync - active user IDs:', Array.from(activeIds));
           setOnlineUsers(activeIds);
 
@@ -118,46 +319,65 @@ export const AppProvider = ({ children }) => {
           const myIdLower = user.id.toLowerCase();
           
           if (key.toLowerCase() !== myIdLower) {
-            const lastSeenTime = Date.now();
+            const keyLower = key.toLowerCase();
             
-            setChats(prev => prev.map(chat => {
-              if (chat.type === 'direct' && chat.contact) {
-                const contactIdLower = chat.contact.id?.toLowerCase();
-                const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
-                const isMatch = (contactIdLower === key.toLowerCase()) ||
-                                (contactShadowIdLower === key.toLowerCase());
-                
-                if (isMatch) {
-                  return {
-                    ...chat,
-                    contact: { ...chat.contact, isOnline: false, lastSeen: lastSeenTime }
-                  };
-                }
-              }
-              return chat;
-            }));
-
-            const currentChats = chatsRef.current || [];
-            const targetChat = currentChats.find(chat => {
-              if (chat.type === 'direct' && chat.contact) {
-                const contactIdLower = chat.contact.id?.toLowerCase();
-                const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
-                return (contactIdLower === key.toLowerCase()) || (contactShadowIdLower === key.toLowerCase());
-              }
-              return false;
-            });
-
-            if (targetChat) {
-              const updatedChatData = { ...targetChat, lastSeen: lastSeenTime, messages: [] };
-              supabase.from('chats').upsert({
-                owner_id: myIdLower,
-                chat_id: targetChat.id.toLowerCase(),
-                chat_data: updatedChatData
-              }, { onConflict: 'owner_id, chat_id' })
-              .then(({ error }) => {
-                if (error) console.error('[ShadowTalk] Error saving last seen:', error);
-              });
+            // Clear any existing leave timeout for this user
+            if (offlineTimeoutRef.current[keyLower]) {
+              clearTimeout(offlineTimeoutRef.current[keyLower]);
             }
+            
+            // Debounce offline updates by 3 seconds to eliminate network fluctuation
+            offlineTimeoutRef.current[keyLower] = setTimeout(() => {
+              const lastSeenTime = Date.now();
+              
+              setChats(prev => prev.map(chat => {
+                if (chat.type === 'direct' && chat.contact) {
+                  const contactIdLower = chat.contact.id?.toLowerCase();
+                  const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+                  const isMatch = (contactIdLower === keyLower) ||
+                                  (contactShadowIdLower === keyLower);
+                  
+                  if (isMatch) {
+                    return {
+                      ...chat,
+                      contact: { ...chat.contact, isOnline: false, lastSeen: lastSeenTime }
+                    };
+                  }
+                }
+                return chat;
+              }));
+
+              const currentChats = chatsRef.current || [];
+              const targetChat = currentChats.find(chat => {
+                if (chat.type === 'direct' && chat.contact) {
+                  const contactIdLower = chat.contact.id?.toLowerCase();
+                  const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+                  return (contactIdLower === keyLower) || (contactShadowIdLower === keyLower);
+                }
+                return false;
+              });
+
+              if (targetChat) {
+                const updatedChatData = {
+                  ...targetChat,
+                  contact: {
+                    ...targetChat.contact,
+                    isOnline: false,
+                    lastSeen: lastSeenTime
+                  }
+                };
+                supabase.from('chats').upsert({
+                  owner_id: myIdLower,
+                  chat_id: targetChat.id.toLowerCase(),
+                  chat_data: updatedChatData
+                }, { onConflict: 'owner_id, chat_id' })
+                .then(({ error }) => {
+                  if (error) console.error('[ShadowTalk] Error saving last seen:', error);
+                });
+              }
+              
+              delete offlineTimeoutRef.current[keyLower];
+            }, 3000);
           }
         });
 
@@ -167,46 +387,66 @@ export const AppProvider = ({ children }) => {
             online_at: new Date().toISOString(),
             shadowId: user.shadowId?.toLowerCase()
           });
+          // Update our own self presence when we come online
+          updateSelfPresence(false);
         }
       });
 
       presenceChannelRef.current = channel;
     };
 
-    const destroyPresence = async () => {
+    const destroyPresence = async (isClosing = false) => {
       if (presenceChannelRef.current) {
         console.log('[ShadowTalk] Destroying Presence Channel');
-        supabase.removeChannel(presenceChannelRef.current);
+        try {
+          supabase.removeChannel(presenceChannelRef.current);
+        } catch (e) {
+          console.warn('[ShadowTalk] Error removing presence channel:', e);
+        }
         presenceChannelRef.current = null;
+      }
+      
+      // Update self presence to reflect exactly when we went offline
+      await updateSelfPresence(isClosing);
+
+      if (supabase.realtime && typeof supabase.realtime.disconnect === 'function') {
+        console.log('[ShadowTalk] Disconnecting realtime socket...');
+        supabase.realtime.disconnect();
       }
     };
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'hidden') {
-        await destroyPresence();
+        await destroyPresence(true);
       } else {
         initPresence();
+        syncContactsLastSeen(chatsRef.current);
       }
     };
-    const handleBlur = async () => {
-      await destroyPresence();
-    };
-    const handleFocus = async () => {
-      initPresence();
+
+    const handleUnload = () => {
+      destroyPresence(true);
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pagehide', handleUnload);
+    window.addEventListener('beforeunload', handleUnload);
 
     // Initial load
     initPresence();
+    syncContactsLastSeen(chatsRef.current);
+
+    // Run a periodic heartbeat every 60 seconds to refresh our self presence
+    const heartbeat = setInterval(() => {
+      updateSelfPresence(false);
+    }, 60000);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('focus', handleFocus);
-      destroyPresence();
+      window.removeEventListener('pagehide', handleUnload);
+      window.removeEventListener('beforeunload', handleUnload);
+      clearInterval(heartbeat);
+      destroyPresence(false);
     };
   }, [user?.id]);
 
@@ -2170,6 +2410,7 @@ export const AppProvider = ({ children }) => {
         setChats(finalMerged);
         console.log('[ShadowTalk] loginMockUser finished. Merged chats count:', finalMerged.length);
         markIncomingMessagesAsDelivered(finalMerged, shortId);
+        syncContactsLastSeen(finalMerged);
       } else {
         setChats([]);
         console.log('[ShadowTalk] loginMockUser finished. No chats found.');
@@ -4564,7 +4805,8 @@ export const AppProvider = ({ children }) => {
     showConfirm,
     activeChatId,
     setActiveChatId,
-    onlineUsers
+    onlineUsers,
+    syncContactsLastSeen
   };
 
   window.AppContextValue = contextValue;
