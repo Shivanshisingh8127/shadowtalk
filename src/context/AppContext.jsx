@@ -485,6 +485,26 @@ export const AppProvider = ({ children }) => {
         console.log('[ShadowTalk] Message received in foreground: ', payload);
         playNotificationSound();
         showToast(`New message: ${payload.notification?.body || 'Check chats'}`, 'info');
+        
+        // Also show in the notification tray of the Android system
+        if (Notification.permission === 'granted') {
+          const notificationTitle = payload.notification?.title || 'New Message';
+          const notificationOptions = {
+            body: payload.notification?.body || 'You received a new message.',
+            icon: '/favicon.svg'
+          };
+
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then((registration) => {
+              registration.showNotification(notificationTitle, notificationOptions);
+            }).catch(err => {
+              console.error('[ShadowTalk] Failed to show notification via Service Worker:', err);
+              new Notification(notificationTitle, notificationOptions);
+            });
+          } else {
+            new Notification(notificationTitle, notificationOptions);
+          }
+        }
       });
     }
   }, [user?.id]);
