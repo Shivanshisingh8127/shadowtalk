@@ -117,9 +117,8 @@ const BottomNav = () => {
 };
 
 const ProtectedRoute = () => {
-  const { user, settings, isLoading } = useAppContext();
+  const { user, settings, isLoading, isOffline } = useAppContext();
   const location = useLocation();
-  const [networkStatus, setNetworkStatus] = useState('connected'); // 'connected', 'connecting', 'offline'
   const [isAppLocked, setIsAppLocked] = useState(settings.lockApp);
 
   useEffect(() => {
@@ -130,17 +129,6 @@ const ProtectedRoute = () => {
       setIsAppLocked(false);
     }
   }, [settings.lockApp]);
-
-  useEffect(() => {
-    // Simulate network changes
-    const timer = setTimeout(() => {
-      setNetworkStatus('connected');
-    }, 3000);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, []);
 
   if (isLoading) {
     return (
@@ -162,10 +150,10 @@ const ProtectedRoute = () => {
 
   return (
     <div className="app-container animate-fade-in">
-      {networkStatus !== 'connected' && (
+      {isOffline && (
         <div style={{
-          backgroundColor: networkStatus === 'offline' ? 'var(--accent-danger)' : '#ffb300',
-          color: networkStatus === 'offline' ? '#fff' : '#000',
+          backgroundColor: 'var(--accent-danger)',
+          color: '#fff',
           textAlign: 'center',
           padding: '4px',
           fontSize: '0.75rem',
@@ -174,10 +162,10 @@ const ProtectedRoute = () => {
           top: 0, left: 0, right: 0,
           zIndex: 200
         }}>
-          {networkStatus === 'offline' ? 'Offline - Reconnecting...' : 'Connecting to ShadowTalk Network...'}
+          Offline - Reconnecting...
         </div>
       )}
-      <div className={`app-content ${isNavHidden ? 'no-nav' : ''}`} style={{ paddingTop: networkStatus !== 'connected' ? '24px' : '0' }}>
+      <div className={`app-content ${isNavHidden ? 'no-nav' : ''}`} style={{ paddingTop: isOffline ? '24px' : '0' }}>
         <Outlet />
       </div>
     </div>

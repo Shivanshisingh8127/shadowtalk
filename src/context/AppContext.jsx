@@ -120,18 +120,24 @@ export const AppProvider = ({ children }) => {
     };
   }, [user?.id]);
 
-  // Handle Browser Coming Online Sweep
+  // Handle Browser Coming Online/Offline Sweep
   useEffect(() => {
     const handleOnline = () => {
-      console.log('[ShadowTalk] Browser came online, refreshing connection...');
-      if (userRef.current) {
-        loginMockUser(userRef.current.name, userRef.current.id, userRef.current.phrase, true);
-      }
+      console.log('[ShadowTalk] Browser came online, syncing data...');
+      setIsOffline(false);
+      syncMissedMessages();
+      retryPendingMessages();
+    };
+    const handleOffline = () => {
+      console.log('[ShadowTalk] Browser went offline');
+      setIsOffline(true);
     };
     
     window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     return () => {
       window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
@@ -161,6 +167,7 @@ export const AppProvider = ({ children }) => {
 
   const [toast, setToast] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   // Persistence effects
   useEffect(() => {
@@ -362,8 +369,31 @@ export const AppProvider = ({ children }) => {
         }
       });
 
+      const playNotificationSound = () => {
+        try {
+          const context = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = context.createOscillator();
+          const gainNode = context.createGain();
+
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(880, context.currentTime);
+          oscillator.connect(gainNode);
+          gainNode.connect(context.destination);
+
+          gainNode.gain.setValueAtTime(0, context.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0.5, context.currentTime + 0.05);
+          gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.3);
+
+          oscillator.start(context.currentTime);
+          oscillator.stop(context.currentTime + 0.3);
+        } catch (e) {
+          console.warn('[ShadowTalk] Failed to play sound:', e);
+        }
+      };
+
       messaging.onMessage((payload) => {
         console.log('[ShadowTalk] Message received in foreground: ', payload);
+        playNotificationSound();
         showToast(`New message: ${payload.notification?.body || 'Check chats'}`, 'info');
       });
     }
@@ -2487,6 +2517,7 @@ export const AppProvider = ({ children }) => {
       id: `m_${Date.now()}`,
       text,
       media,
+      deliveryStatus: 'sending', // Track delivery state
       replyTo: replyTo ? {
         id: replyTo.id,
         text: replyTo.text,
@@ -2609,22 +2640,43 @@ export const AppProvider = ({ children }) => {
       delete_at: newMessage.deleteAt || null
     }).select('created_at').single()
     .then(({ data: dbMsg }) => {
-      // Sync the sender's local timestamp to match the exact server database time
-      if (dbMsg?.created_at) {
-        const serverTime = new Date(dbMsg.created_at).getTime();
-        setChats(prev => prev.map(c => {
-          if (c.id.toLowerCase() === canonicalId) {
-            const msgs = [...(c.messages || [])];
-            const idx = msgs.findIndex(m => m.id === newMessage.id);
-            if (idx >= 0) {
-              msgs[idx] = { ...msgs[idx], timestamp: serverTime };
+      // Sync the sender's local timestamp and set deliveryStatus to sent
+      setChats(prev => prev.map(c => {
+        if (c.id.toLowerCase() === canonicalId) {
+          const msgs = [...(c.messages || [])];
+          const idx = msgs.findIndex(m => m.id === newMessage.id);
+          if (idx >= 0) {
+            msgs[idx] = { ...msgs[idx], deliveryStatus: 'sent' };
+            if (dbMsg?.created_at) {
+              const serverTime = new Date(dbMsg.created_at).getTime();
+              msgs[idx].timestamp = serverTime;
               msgs.sort((a, b) => a.timestamp - b.timestamp);
             }
-            return { ...c, messages: msgs, lastActivity: Math.max(c.lastActivity || 0, serverTime) };
           }
-          return c;
-        }));
-      }
+          const serverTime = dbMsg?.created_at ? new Date(dbMsg.created_at).getTime() : Date.now();
+          return { ...c, messages: msgs, lastActivity: Math.max(c.lastActivity || 0, serverTime) };
+        }
+        return c;
+      }));
+      return dbMsg;
+    }, (err) => {
+      console.error('[ShadowTalk] Message insert failed:', err);
+      // Set deliveryStatus to failed
+      setChats(prev => prev.map(c => {
+        if (c.id.toLowerCase() === canonicalId) {
+          const msgs = [...(c.messages || [])];
+          const idx = msgs.findIndex(m => m.id === newMessage.id);
+          if (idx >= 0) {
+            msgs[idx] = { ...msgs[idx], deliveryStatus: 'failed' };
+          }
+          return { ...c, messages: msgs };
+        }
+        return c;
+      }));
+      return null;
+    })
+    .then((dbMsg) => {
+      if (!dbMsg) return; // Skip metadata update if insert failed
 
       // 2. Persist Metadata (LIGHT BLOB)
       const chatMetadata = { ...targetChat, messages: [] };
@@ -4112,6 +4164,129 @@ export const AppProvider = ({ children }) => {
     showToast(`${memberToRemove.name} removed from group`);
   };
 
+  async function syncMissedMessages() {
+    if (!user?.id || !navigator.onLine) return;
+    console.log('[ShadowTalk] Syncing missed messages...');
+
+    const currentChats = chatsRef.current || [];
+    for (const chat of currentChats) {
+      const lastMsg = chat.messages?.[chat.messages.length - 1];
+      const lastTimestamp = lastMsg?.timestamp || 0;
+
+      const { data: newMsgs, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', chat.id.toLowerCase())
+        .gt('created_at', new Date(lastTimestamp).toISOString())
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error(`[ShadowTalk] Error syncing messages for chat ${chat.id}:`, error);
+        continue;
+      }
+
+      if (newMsgs && newMsgs.length > 0) {
+        console.log(`[ShadowTalk] Found ${newMsgs.length} missed messages for chat ${chat.id}`);
+        setChats(prev => prev.map(c => {
+          if (c.id.toLowerCase() === chat.id.toLowerCase()) {
+            const existingIds = new Set(c.messages?.map(m => m.id) || []);
+            const filteredNewMsgs = newMsgs
+              .filter(m => !existingIds.has(m.id))
+              .map(m => {
+                const content = m.content;
+                return {
+                  ...content,
+                  id: m.id,
+                  text: decrypt(content.text, chat.id),
+                  timestamp: new Date(m.created_at).getTime()
+                };
+              });
+
+            const mergedMsgs = [...(c.messages || []), ...filteredNewMsgs];
+            mergedMsgs.sort((a, b) => a.timestamp - b.timestamp);
+
+            return { ...c, messages: mergedMsgs, lastActivity: Math.max(c.lastActivity || 0, mergedMsgs[mergedMsgs.length - 1]?.timestamp || 0) };
+          }
+          return c;
+        }));
+      }
+    }
+  };
+
+  async function retryPendingMessages() {
+    if (!user?.id || !navigator.onLine) return;
+    console.log('[ShadowTalk] Retrying pending messages...');
+
+    const currentChats = chatsRef.current || [];
+    for (const chat of currentChats) {
+      const failedMsgs = chat.messages?.filter(m => m.deliveryStatus === 'failed') || [];
+      for (const msg of failedMsgs) {
+        console.log(`[ShadowTalk] Retrying message ${msg.id} for chat ${chat.id}`);
+        
+        setChats(prev => prev.map(c => {
+          if (c.id.toLowerCase() === chat.id.toLowerCase()) {
+            return {
+              ...c,
+              messages: (c.messages || []).map(m =>
+                m.id === msg.id ? { ...m, deliveryStatus: 'sending' } : m
+              )
+            };
+          }
+          return c;
+        }));
+
+        const encryptedMsg = {
+          ...msg,
+          text: encrypt(msg.text, chat.id),
+          replyTo: msg.replyTo ? {
+            ...msg.replyTo,
+            text: encrypt(msg.replyTo.text, chat.id)
+          } : null
+        };
+
+        supabase.from('messages').insert({
+          id: msg.id,
+          chat_id: chat.id.toLowerCase(),
+          sender_id: user.id.toLowerCase(),
+          content: encryptedMsg,
+          delete_at: msg.deleteAt || null
+        }).select('created_at').single()
+        .then(({ data: dbMsg }) => {
+          setChats(prev => prev.map(c => {
+            if (c.id.toLowerCase() === chat.id.toLowerCase()) {
+              const msgs = [...(c.messages || [])];
+              const idx = msgs.findIndex(m => m.id === msg.id);
+              if (idx >= 0) {
+                msgs[idx] = { ...msgs[idx], deliveryStatus: 'sent' };
+                if (dbMsg?.created_at) {
+                  const serverTime = new Date(dbMsg.created_at).getTime();
+                  msgs[idx].timestamp = serverTime;
+                  msgs.sort((a, b) => a.timestamp - b.timestamp);
+                }
+              }
+              const serverTime = dbMsg?.created_at ? new Date(dbMsg.created_at).getTime() : Date.now();
+              return { ...c, messages: msgs, lastActivity: Math.max(c.lastActivity || 0, serverTime) };
+            }
+            return c;
+          }));
+        }, (err) => {
+          console.error(`[ShadowTalk] Retry failed for message ${msg.id}:`, err);
+          setChats(prev => prev.map(c => {
+            if (c.id.toLowerCase() === chat.id.toLowerCase()) {
+              const msgs = [...(c.messages || [])];
+              const idx = msgs.findIndex(m => m.id === msg.id);
+              if (idx >= 0) {
+                msgs[idx] = { ...msgs[idx], deliveryStatus: 'failed' };
+              }
+              return { ...c, messages: msgs };
+            }
+            return c;
+          }));
+        });
+      }
+    }
+  };
+
   const inviteFriend = async () => {
     const appUrl = 'https://shadowtalk.app'; // Placeholder
     const inviteMessage = `🚀 Have you tried ShadowTalk yet?\n\nIt's the ultimate anonymous messaging app with zero data tracking. No phone, no email, just pure privacy.\n\nDownload it here: ${appUrl}\n\nLet's chat securely! 🔒✨`;
@@ -4236,7 +4411,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const contextValue = {
-    user, setUser, loginMockUser, logout,
+    user, setUser, loginMockUser, logout, isOffline,
     theme, setTheme,
     themeVariant, setThemeVariant,
     primaryColor, setPrimaryColor,
