@@ -43,7 +43,23 @@ export const AppProvider = ({ children }) => {
   const userRef = useRef(user);
   const lastSyncRef = useRef(0);
   useEffect(() => { chatsRef.current = chats; }, [chats]);
-  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { 
+    userRef.current = user; 
+    if (user?.id) {
+      if ('caches' in window) {
+        caches.open('shadowtalk-user').then(cache => {
+          cache.put('/user-id', new Response(user.id.toLowerCase()));
+          console.log('[ShadowTalk] Cached active user ID for background service worker:', user.id);
+        }).catch(err => console.warn('[ShadowTalk] Cache update failed:', err));
+      }
+    } else {
+      if ('caches' in window) {
+        caches.delete('shadowtalk-user').then(() => {
+          console.log('[ShadowTalk] Cleared cached user ID on logout');
+        }).catch(err => console.warn('[ShadowTalk] Cache clear failed:', err));
+      }
+    }
+  }, [user]);
 
   const [requests, setRequests] = useState([]);
   const chatSubRef = useRef(null);
