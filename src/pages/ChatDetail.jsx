@@ -93,7 +93,7 @@ export default function ChatDetail() {
     settings, startCall, isLoading, updateChatSettings, updateGroupSettings, loginMockUser, decrypt, acceptRequest, rejectRequest,
     blockContact, unblockContact, inviteFriend, broadcastProfileUpdate, downloadFile,
     forwardMessage, toggleStarMessage, togglePinMessage, archiveChat, setTypingStatus, typingUsers,
-    updateChatTheme, showConfirm, setActiveChatId
+    updateChatTheme, showConfirm, setActiveChatId, syncContactsLastSeen
   } = useAppContext();
   const searchParams = new URLSearchParams(location.search);
   const initialSearchMode = searchParams.get('search') === 'true';
@@ -316,6 +316,10 @@ export default function ChatDetail() {
 
   useEffect(() => {
     if (!isGroup && otherId && user?.id) {
+      if (syncContactsLastSeen && chats && chats.length > 0) {
+        syncContactsLastSeen(chats);
+      }
+      
       const checkStatus = async () => {
         // Check requests table for rejection
         const { data: reqData } = await supabase.from('requests')
@@ -362,6 +366,29 @@ export default function ChatDetail() {
             }
             return c;
           }));
+        }
+
+        // Fetch other user's self-chat to get their fresh global lastSeen
+        const { data: selfChatData } = await supabase.from('chats')
+          .select('chat_data')
+          .eq('owner_id', otherId)
+          .eq('chat_id', otherId)
+          .maybeSingle();
+
+        if (selfChatData?.chat_data?.contact) {
+          const freshLastSeen = selfChatData.chat_data.contact.lastSeen || selfChatData.chat_data.lastActivity;
+          if (freshLastSeen) {
+            setChats(prev => prev.map(c => {
+              const isMatch = c.id === id || c.id === otherId;
+              if (isMatch && c.contact && c.contact.lastSeen !== freshLastSeen) {
+                return {
+                  ...c,
+                  contact: { ...c.contact, lastSeen: freshLastSeen }
+                };
+              }
+              return c;
+            }));
+          }
         }
       };
       checkStatus();
