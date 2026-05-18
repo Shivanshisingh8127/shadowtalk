@@ -399,7 +399,7 @@ export default function Chats() {
       )}
 
       {view === 'chats' && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '160px' }}>
           {filteredChats.length === 0 ? (
             <div style={{ 
               flex: 1, 
