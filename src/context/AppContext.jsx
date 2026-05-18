@@ -176,11 +176,6 @@ export const AppProvider = ({ children }) => {
     const destroyPresence = async () => {
       if (presenceChannelRef.current) {
         console.log('[ShadowTalk] Destroying Presence Channel');
-        try {
-          await presenceChannelRef.current.untrack();
-        } catch (e) {
-          console.warn('[ShadowTalk] Untrack failed on destroy:', e);
-        }
         supabase.removeChannel(presenceChannelRef.current);
         presenceChannelRef.current = null;
       }

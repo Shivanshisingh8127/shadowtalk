@@ -1499,7 +1499,16 @@ export default function ChatDetail() {
                     </span>
                   ) : (!isGroup && safeChat.contact?.lastSeen && !isReadOnly && !isNoteToSelf) ? (
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      last seen {new Date(safeChat.contact.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      last seen {(() => {
+                        const date = new Date(safeChat.contact.lastSeen);
+                        const now = new Date();
+                        const isToday = date.toDateString() === now.toDateString();
+                        const isYesterday = date.toDateString() === new Date(now - 86400000).toDateString();
+                        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        if (isToday) return `today at ${timeStr}`;
+                        if (isYesterday) return `yesterday at ${timeStr}`;
+                        return `${date.toLocaleDateString()} at ${timeStr}`;
+                      })()}
                     </span>
                   ) : null}
                 </div>
