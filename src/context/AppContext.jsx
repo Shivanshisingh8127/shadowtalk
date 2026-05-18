@@ -61,138 +61,157 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { onlineUsersRef.current = onlineUsers; }, [onlineUsers]);
 
   // Real-time Presence Tracking
+  const presenceChannelRef = useRef(null);
+
   useEffect(() => {
     if (!user?.id) return;
     const myIdLower = user.id.toLowerCase();
-    const presenceChannel = supabase.channel('online-status', {
-      config: {
-        presence: {
-          key: myIdLower,
+
+    const initPresence = () => {
+      if (presenceChannelRef.current) return;
+      console.log('[ShadowTalk] Initializing Presence Channel');
+      
+      const channel = supabase.channel('online-status', {
+        config: {
+          presence: {
+            key: myIdLower,
+          },
         },
-      },
-    });
+      });
 
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        const activeIds = new Set();
-        Object.entries(state).forEach(([key, presenceItems]) => {
-          activeIds.add(key.toLowerCase());
-          if (Array.isArray(presenceItems)) {
-            presenceItems.forEach(item => {
-              if (item.shadowId) {
-                activeIds.add(item.shadowId.toLowerCase());
-              }
-            });
-          }
-        });
-        console.log('[ShadowTalk] Presence Sync - active user IDs:', Array.from(activeIds));
-        setOnlineUsers(activeIds);
-
-        // Dynamically update online status of contacts in local chats state
-        setChats(prev => prev.map(chat => {
-          if (chat.type === 'direct' && chat.contact) {
-            const contactIdLower = chat.contact.id?.toLowerCase();
-            const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
-            const isContactOnline = (contactIdLower && activeIds.has(contactIdLower)) ||
-                                    (contactShadowIdLower && activeIds.has(contactShadowIdLower));
-            if (chat.contact.isOnline !== isContactOnline) {
-              return {
-                ...chat,
-                contact: { ...chat.contact, isOnline: isContactOnline }
-              };
+      channel
+        .on('presence', { event: 'sync' }, () => {
+          const state = channel.presenceState();
+          const activeIds = new Set();
+          Object.entries(state).forEach(([key, presenceItems]) => {
+            activeIds.add(key.toLowerCase());
+            if (Array.isArray(presenceItems)) {
+              presenceItems.forEach(item => {
+                if (item.shadowId) {
+                  activeIds.add(item.shadowId.toLowerCase());
+                }
+              });
             }
-          }
-          return chat;
-        }));
-      })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        console.log('[ShadowTalk] Presence Leave for key:', key, leftPresences);
-        if (!user?.id) return;
-        const myIdLower = user.id.toLowerCase();
-        
-        if (key.toLowerCase() !== myIdLower) {
-          const lastSeenTime = Date.now();
-          
+          });
+          console.log('[ShadowTalk] Presence Sync - active user IDs:', Array.from(activeIds));
+          setOnlineUsers(activeIds);
+
           setChats(prev => prev.map(chat => {
             if (chat.type === 'direct' && chat.contact) {
               const contactIdLower = chat.contact.id?.toLowerCase();
               const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
-              const isMatch = (contactIdLower === key.toLowerCase()) ||
-                              (contactShadowIdLower === key.toLowerCase());
-              
-              if (isMatch) {
+              const isContactOnline = (contactIdLower && activeIds.has(contactIdLower)) ||
+                                      (contactShadowIdLower && activeIds.has(contactShadowIdLower));
+              if (chat.contact.isOnline !== isContactOnline) {
                 return {
                   ...chat,
-                  contact: { ...chat.contact, isOnline: false, lastSeen: lastSeenTime }
+                  contact: { ...chat.contact, isOnline: isContactOnline }
                 };
               }
             }
             return chat;
           }));
+        })
+        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+          console.log('[ShadowTalk] Presence Leave for key:', key, leftPresences);
+          if (!user?.id) return;
+          const myIdLower = user.id.toLowerCase();
+          
+          if (key.toLowerCase() !== myIdLower) {
+            const lastSeenTime = Date.now();
+            
+            setChats(prev => prev.map(chat => {
+              if (chat.type === 'direct' && chat.contact) {
+                const contactIdLower = chat.contact.id?.toLowerCase();
+                const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+                const isMatch = (contactIdLower === key.toLowerCase()) ||
+                                (contactShadowIdLower === key.toLowerCase());
+                
+                if (isMatch) {
+                  return {
+                    ...chat,
+                    contact: { ...chat.contact, isOnline: false, lastSeen: lastSeenTime }
+                  };
+                }
+              }
+              return chat;
+            }));
 
-          const currentChats = chatsRef.current || [];
-          const targetChat = currentChats.find(chat => {
-            if (chat.type === 'direct' && chat.contact) {
-              const contactIdLower = chat.contact.id?.toLowerCase();
-              const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
-              return (contactIdLower === key.toLowerCase()) || (contactShadowIdLower === key.toLowerCase());
-            }
-            return false;
-          });
-
-          if (targetChat) {
-            const updatedChatData = { ...targetChat, lastSeen: lastSeenTime, messages: [] };
-            supabase.from('chats').upsert({
-              owner_id: myIdLower,
-              chat_id: targetChat.id.toLowerCase(),
-              chat_data: updatedChatData
-            }, { onConflict: 'owner_id, chat_id' })
-            .then(({ error }) => {
-              if (error) console.error('[ShadowTalk] Error saving last seen:', error);
+            const currentChats = chatsRef.current || [];
+            const targetChat = currentChats.find(chat => {
+              if (chat.type === 'direct' && chat.contact) {
+                const contactIdLower = chat.contact.id?.toLowerCase();
+                const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+                return (contactIdLower === key.toLowerCase()) || (contactShadowIdLower === key.toLowerCase());
+              }
+              return false;
             });
+
+            if (targetChat) {
+              const updatedChatData = { ...targetChat, lastSeen: lastSeenTime, messages: [] };
+              supabase.from('chats').upsert({
+                owner_id: myIdLower,
+                chat_id: targetChat.id.toLowerCase(),
+                chat_data: updatedChatData
+              }, { onConflict: 'owner_id, chat_id' })
+              .then(({ error }) => {
+                if (error) console.error('[ShadowTalk] Error saving last seen:', error);
+              });
+            }
           }
+        });
+
+      channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            online_at: new Date().toISOString(),
+            shadowId: user.shadowId?.toLowerCase()
+          });
         }
       });
 
+      presenceChannelRef.current = channel;
+    };
+
+    const destroyPresence = async () => {
+      if (presenceChannelRef.current) {
+        console.log('[ShadowTalk] Destroying Presence Channel');
+        try {
+          await presenceChannelRef.current.untrack();
+        } catch (e) {
+          console.warn('[ShadowTalk] Untrack failed on destroy:', e);
+        }
+        supabase.removeChannel(presenceChannelRef.current);
+        presenceChannelRef.current = null;
+      }
+    };
+
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'hidden') {
-        await presenceChannel.untrack();
+        await destroyPresence();
       } else {
-        await presenceChannel.track({
-          online_at: new Date().toISOString(),
-          shadowId: user.shadowId?.toLowerCase()
-        });
+        initPresence();
       }
     };
     const handleBlur = async () => {
-      await presenceChannel.untrack();
+      await destroyPresence();
     };
     const handleFocus = async () => {
-      await presenceChannel.track({
-        online_at: new Date().toISOString(),
-        shadowId: user.shadowId?.toLowerCase()
-      });
+      initPresence();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
 
-    presenceChannel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await presenceChannel.track({
-          online_at: new Date().toISOString(),
-          shadowId: user.shadowId?.toLowerCase()
-        });
-      }
-    });
+    // Initial load
+    initPresence();
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('focus', handleFocus);
-      presenceChannel.unsubscribe();
+      destroyPresence();
     };
   }, [user?.id]);
 
