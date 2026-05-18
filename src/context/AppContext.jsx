@@ -321,6 +321,54 @@ export const AppProvider = ({ children }) => {
     }
   }, [followSystem]);
 
+  // Firebase Messaging Setup
+  useEffect(() => {
+    if (!user?.id) return;
+
+    if (window.firebase) {
+      const firebaseConfig = {
+        apiKey: "AIzaSyDIe2XGP_yBqcpuPlTldKogDPSZco1QPpo",
+        authDomain: "shadowtalk-f916f.firebaseapp.com",
+        projectId: "shadowtalk-f916f",
+        storageBucket: "shadowtalk-f916f.firebasestorage.app",
+        messagingSenderId: "1050613936240",
+        appId: "1:1050613936240:web:c6eddc78ada268f4f044b5",
+        measurementId: "G-K2N5039J04"
+      };
+
+      let app;
+      if (!window.firebase.apps.length) {
+        app = window.firebase.initializeApp(firebaseConfig);
+      } else {
+        app = window.firebase.app();
+      }
+
+      const messaging = window.firebase.messaging();
+
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          console.log('[ShadowTalk] Notification permission granted.');
+          messaging.getToken({ vapidKey: 'BHqti3ueSZHa2GIY9D1z9rGUzVlPJdujbSfKHZ-Nts85Y6NK6kjWDEoppwxhudJL8KyoTXUkbu0Ki8zXBZNIDkA' })
+            .then((currentToken) => {
+              if (currentToken) {
+                console.log('[ShadowTalk] FCM Token:', currentToken);
+                localStorage.setItem('shadowtalk_fcm_token', currentToken);
+              } else {
+                console.log('[ShadowTalk] No registration token available.');
+              }
+            }).catch((err) => {
+              console.log('[ShadowTalk] Error retrieving token: ', err);
+            });
+        }
+      });
+
+      messaging.onMessage((payload) => {
+        console.log('[ShadowTalk] Message received in foreground: ', payload);
+        showToast(`New message: ${payload.notification?.body || 'Check chats'}`, 'info');
+      });
+    }
+  }, [user?.id]);
+
   // Real-time subscriptions
   useEffect(() => {
     if (!user?.id) return;
