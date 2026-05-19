@@ -1297,19 +1297,12 @@ export default function ContactProfile() {
 
   if (activeView === 'manage_admins' && isGroup && isAdmin) {
     return (
-      <div className="app-container animate-fade-in" style={{ 
-        backgroundImage: 'var(--global-bg-image, none)', 
-        backgroundSize: 'cover', 
-        backgroundPosition: 'center', 
-        color: '#fff', 
-        display: 'flex', 
-        flexDirection: 'column' 
-      }}>
+      <div className="app-container animate-fade-in" style={{ color: '#fff', display: 'flex', flexDirection: 'column' }}>
         <div style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: 'rgba(6, 7, 10, 0.85)',
+          backgroundColor: 'rgba(6, 7, 10, 0.25)',
           backdropFilter: 'blur(30px)',
           WebkitBackdropFilter: 'blur(30px)',
           minHeight: '100vh'
@@ -1449,19 +1442,12 @@ export default function ContactProfile() {
 
   if (activeView === 'promote_members' && isGroup && isAdmin) {
     return (
-      <div className="app-container animate-fade-in" style={{ 
-        backgroundImage: 'var(--global-bg-image, none)', 
-        backgroundSize: 'cover', 
-        backgroundPosition: 'center', 
-        color: '#fff', 
-        display: 'flex', 
-        flexDirection: 'column' 
-      }}>
+      <div className="app-container animate-fade-in" style={{ color: '#fff', display: 'flex', flexDirection: 'column' }}>
         <div style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: 'rgba(6, 7, 10, 0.85)',
+          backgroundColor: 'rgba(6, 7, 10, 0.25)',
           backdropFilter: 'blur(30px)',
           WebkitBackdropFilter: 'blur(30px)',
           minHeight: '100vh'
