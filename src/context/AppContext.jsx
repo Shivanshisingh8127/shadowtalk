@@ -3934,7 +3934,8 @@ export const AppProvider = ({ children }) => {
     }
 
     // SECURITY: Validate permissions for restricted updates
-    if (updates.disappearingConfig !== undefined && targetChat.adminId !== user.id) {
+    const isCurrentUserAdmin = targetChat && (targetChat.adminId === user.id || (targetChat.members || []).some(m => m && m.id === user.id && m.role === 'admin'));
+    if (updates.disappearingConfig !== undefined && !isCurrentUserAdmin) {
       console.warn('[ShadowTalk] Security Block: Non-admin attempted to update disappearingConfig for group', canonicalGroupId);
       showToast('Only admins can modify disappearing messages settings', 'error');
       return;
@@ -4417,7 +4418,8 @@ export const AppProvider = ({ children }) => {
       }
 
       // SECURITY: Validate group ownership/admin role frontend-side
-      if (targetChat.adminId !== user.id) {
+      const isCurrentUserAdmin = targetChat && (targetChat.adminId === user.id || (targetChat.members || []).some(m => m && m.id === user.id && m.role === 'admin'));
+      if (!isCurrentUserAdmin) {
         console.warn('[ShadowTalk] Security Block: Non-admin attempted to delete group', canonicalGroupId);
         showToast('Only admins can delete this group', 'error');
         return;
@@ -4430,7 +4432,7 @@ export const AppProvider = ({ children }) => {
         .from('chats')
         .delete()
         .eq('chat_id', canonicalGroupId)
-        .filter('chat_data->>adminId', 'eq', user.id);
+        .filter('chat_data->>adminId', 'eq', targetChat.adminId);
 
       if (dbError) {
         console.error('[ShadowTalk] Failed to delete group records from DB:', dbError);
@@ -4639,7 +4641,8 @@ export const AppProvider = ({ children }) => {
 
     const canonicalGroupId = groupId.toLowerCase();
     const targetChat = chats.find(c => c.id.toLowerCase() === canonicalGroupId);
-    if (!targetChat || targetChat.adminId !== user.id) {
+    const isCurrentUserAdmin = targetChat && (targetChat.adminId === user.id || (targetChat.members || []).some(m => m && m.id === user.id && m.role === 'admin'));
+    if (!targetChat || !isCurrentUserAdmin) {
       showToast('Only admin can add members', 'error');
       return;
     }
@@ -4799,7 +4802,8 @@ export const AppProvider = ({ children }) => {
     const canonicalGroupId = groupId.toLowerCase();
     const targetChat = chats.find(c => c.id.toLowerCase() === canonicalGroupId);
 
-    if (!targetChat || targetChat.adminId !== user.id) {
+    const isCurrentUserAdmin = targetChat && (targetChat.adminId === user.id || (targetChat.members || []).some(m => m && m.id === user.id && m.role === 'admin'));
+    if (!targetChat || !isCurrentUserAdmin) {
       showToast('Only admin can remove members', 'error');
       return;
     }
@@ -4963,7 +4967,8 @@ export const AppProvider = ({ children }) => {
     const canonicalGroupId = groupId.toLowerCase();
     const targetChat = chats.find(c => c.id.toLowerCase() === canonicalGroupId);
 
-    if (!targetChat || targetChat.adminId !== user.id) {
+    const isCurrentUserAdmin = targetChat && (targetChat.adminId === user.id || (targetChat.members || []).some(m => m && m.id === user.id && m.role === 'admin'));
+    if (!targetChat || !isCurrentUserAdmin) {
       showToast('Only admin can promote members', 'error');
       return;
     }

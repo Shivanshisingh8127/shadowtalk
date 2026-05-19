@@ -205,7 +205,7 @@ export default function ChatDetail() {
     (id?.toLowerCase() === (user?.id || '').toLowerCase() && !safeChat.contact?.id)
   );
   const name = isNoteToSelf ? 'Note to Self' : (isGroup ? (safeChat.name || 'Unnamed Group') : (safeChat.contact?.nickname || safeChat.contact?.name || id));
-  const isAdmin = isGroup && safeChat.adminId === user?.id;
+  const isAdmin = isGroup && (safeChat.adminId === user?.id || (safeChat.members || []).some(m => m && m.id === user?.id && m.role === 'admin'));
   const isParticipant = isGroup ? (safeChat.members && Array.isArray(safeChat.members) && safeChat.members.some(m => m && (String(m.id).toLowerCase() === String(user?.id).toLowerCase() || String(m.shadowId).toLowerCase() === String(user?.shadowId).toLowerCase()))) : true;
   const isRemoved = isGroup && !isParticipant && !isAdmin && (safeChat.status === 'removed' || !!chat);
   const rejoinRequested = safeChat.rejoinRequested || false;
@@ -3099,7 +3099,7 @@ export default function ChatDetail() {
               </button>
 
               {/* Delete for everyone */}
-              {(deleteConfirmMsg.msg.senderId === user?.id || safeChat.adminId === user?.id) && (
+              {(deleteConfirmMsg.msg.senderId === user?.id || isAdmin) && (
                 <button
                   onClick={() => setDeleteConfirmMsg({ msg: deleteConfirmMsg.msg, type: 'confirm_everyone' })}
                   style={{
@@ -3175,7 +3175,7 @@ export default function ChatDetail() {
               </button>
 
               {/* Delete for everyone */}
-              {(deleteConfirmMsg.msgs.every(m => m.senderId === user?.id) || safeChat.adminId === user?.id) && (
+              {(deleteConfirmMsg.msgs.every(m => m.senderId === user?.id) || isAdmin) && (
                 <button
                   onClick={async () => {
                     const ids = deleteConfirmMsg.msgs.map(m => m.id);
