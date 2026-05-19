@@ -177,8 +177,16 @@ export default function Chats() {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} className="animate-fade-in">
-      <div className="screen-header" style={{ justifyContent: 'center', position: 'relative', height: '70px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ position: 'absolute', left: '16px', display: 'flex', alignItems: 'center' }}>
+      <div className="screen-header" style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        padding: '0 16px', 
+        height: '70px', 
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        position: 'relative'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
           <button 
             className="icon-btn" 
             onClick={() => navigate('/settings')}
@@ -193,7 +201,8 @@ export default function Chats() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              flexShrink: 0
             }}
           >
             {user?.avatarUrl ? (
@@ -202,17 +211,20 @@ export default function Chats() {
               <DefaultAvatar name={user?.name} size={40} />
             )}
           </button>
+          <h1 style={{
+            fontSize: '1.4rem',
+            fontWeight: '800',
+            letterSpacing: '-0.5px',
+            margin: 0,
+            color: 'var(--text-primary)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            ShadowTalk
+          </h1>
         </div>
-        <h1 style={{
-          fontSize: '1.4rem',
-          fontWeight: '800',
-          letterSpacing: '-0.5px',
-          margin: 0,
-          color: 'var(--text-primary)'
-        }}>
-          ShadowTalk
-        </h1>
-        <div style={{ position: 'absolute', right: '16px', display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
           {view === 'chats' ? (
             <>
               <button className="icon-btn glass-morphism-light" onClick={() => setFilter(filter === 'archived' ? 'all' : 'archived')} style={{ position: 'relative', border: 'none', color: filter === 'archived' ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
