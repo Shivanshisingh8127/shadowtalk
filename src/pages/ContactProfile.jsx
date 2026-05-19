@@ -1311,18 +1311,17 @@ export default function ContactProfile() {
           </p>
 
           <button 
-            className="hoverable"
+            className="settings-item hoverable"
             style={{
               display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px',
-              backgroundColor: '#1a1a1a', borderRadius: '16px', width: '100%',
-              border: 'none', cursor: 'pointer', marginBottom: '24px'
+              width: '100%', cursor: 'pointer', marginBottom: '24px'
             }}
             onClick={() => setActiveView('promote_members')}
           >
             <div style={{ display: 'flex', position: 'relative' }}>
-              <CrownIcon size={24} color="#fff" />
-              <div style={{ position: 'absolute', bottom: -4, right: -4, backgroundColor: '#1a1a1a', borderRadius: '50%' }}>
-                <PlusIcon size={12} color="#fff" />
+              <CrownIcon size={24} color="var(--accent-primary)" />
+              <div style={{ position: 'absolute', bottom: -4, right: -4, backgroundColor: 'var(--bg-secondary)', borderRadius: '50%', padding: '2px' }}>
+                <PlusIcon size={10} color="var(--accent-primary)" />
               </div>
             </div>
             <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#fff' }}>Promote Members</span>
@@ -1334,11 +1333,10 @@ export default function ContactProfile() {
             <SearchIcon size={20} color="#888" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
             <input 
               type="text" 
+              className="text-input"
               placeholder="Search" 
               style={{
                 width: '100%', padding: '12px 16px 12px 48px',
-                backgroundColor: '#1a1a1a', border: 'none',
-                borderRadius: '12px', color: '#fff',
                 fontSize: '1rem'
               }}
               value={adminSearchQuery}
@@ -1406,11 +1404,10 @@ export default function ContactProfile() {
             <SearchIcon size={20} color="#888" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
             <input 
               type="text" 
+              className="text-input"
               placeholder="Search members to promote" 
               style={{
                 width: '100%', padding: '12px 16px 12px 48px',
-                backgroundColor: '#1a1a1a', border: 'none',
-                borderRadius: '12px', color: '#fff',
                 fontSize: '1rem'
               }}
               value={promoteSearchQuery}
@@ -1434,7 +1431,7 @@ export default function ContactProfile() {
                 return (
                   <div 
                     key={member.id} 
-                    className="hoverable" 
+                    className="settings-item hoverable" 
                     onClick={async () => {
                       const confirmed = await showConfirm({
                         title: 'Promote to Admin?',
@@ -1453,8 +1450,7 @@ export default function ContactProfile() {
                       padding: '12px 16px', 
                       cursor: 'pointer',
                       borderRadius: '12px',
-                      marginBottom: '8px',
-                      backgroundColor: 'rgba(255,255,255,0.02)'
+                      marginBottom: '8px'
                     }}
                   >
                     <div className="avatar" style={{ width: 44, height: 44, borderRadius: '50%', overflow: 'hidden' }}>
