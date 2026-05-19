@@ -461,6 +461,28 @@ export const AppProvider = ({ children }) => {
     const handleOffline = () => {
       console.log('[ShadowTalk] Browser went offline');
       setIsOffline(true);
+      
+      const offlineTime = Date.now();
+      
+      // Attempt to update our own self presence locally (and send keepalive if possible)
+      updateSelfPresence(true);
+
+      // Clear online users and set all contacts to offline
+      setOnlineUsers(new Set());
+      
+      setChats(prev => prev.map(chat => {
+        if (chat.type === 'direct' && chat.contact && chat.contact.isOnline) {
+          return {
+            ...chat,
+            contact: {
+              ...chat.contact,
+              isOnline: false,
+              lastSeen: offlineTime
+            }
+          };
+        }
+        return chat;
+      }));
     };
     
     window.addEventListener('online', handleOnline);
