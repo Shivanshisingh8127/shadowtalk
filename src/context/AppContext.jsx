@@ -999,7 +999,17 @@ export const AppProvider = ({ children }) => {
 
         setChats(prev => {
           let changed = false;
+          const myId = subId1.toLowerCase();
+          const myShadowId = subId2?.toLowerCase();
           const newChats = prev.map(chat => {
+            // Note to Self Safety Guard
+            const isSelfChat = chat.isSelf === true || chat.id.toLowerCase() === myId || (myShadowId && chat.id.toLowerCase() === myShadowId);
+            if (isSelfChat) {
+              const isMsgToSelf = updatedMessage.sender_id.toLowerCase() === myId &&
+                                  (updatedMessage.chat_id.toLowerCase() === myId || (myShadowId && updatedMessage.chat_id.toLowerCase() === myShadowId));
+              if (!isMsgToSelf) return chat;
+            }
+
             const isMatch = chat.id.toLowerCase() === cid ||
                             (chat.contact?.id && chat.contact.id.toLowerCase() === cid) ||
                             (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === cid);
@@ -1077,7 +1087,17 @@ export const AppProvider = ({ children }) => {
 
           setChats(prev => {
             let changed = false;
+            const myId = subId1.toLowerCase();
+            const myShadowId = subId2?.toLowerCase();
             const newChats = prev.map(chat => {
+              // Note to Self Safety Guard
+              const isSelfChat = chat.isSelf === true || chat.id.toLowerCase() === myId || (myShadowId && chat.id.toLowerCase() === myShadowId);
+              if (isSelfChat) {
+                const isMsgToSelf = updatedMessage.sender_id.toLowerCase() === myId &&
+                                    (updatedMessage.chat_id.toLowerCase() === myId || (myShadowId && updatedMessage.chat_id.toLowerCase() === myShadowId));
+                if (!isMsgToSelf) return chat;
+              }
+
               const isMatch = chat.id.toLowerCase() === cid ||
                               (chat.contact?.id && chat.contact.id.toLowerCase() === cid) ||
                               (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === cid);
@@ -1491,9 +1511,22 @@ export const AppProvider = ({ children }) => {
       // [FIX] Determine the correct local chat ID for routing.
       // For direct chats, the DB chat_id is always the RECIPIENT.
       // If we are the recipient, the local chat ID is the SENDER.
+      // For system messages, extract partnerId if available in the content.
+      let systemGid = chatId.toLowerCase();
+      if (senderId === 'system') {
+        try {
+          const parsed = msg.content ? (typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content) : null;
+          if (parsed?.partnerId) {
+            systemGid = parsed.partnerId.toLowerCase();
+          }
+        } catch (e) {
+          console.warn('[ShadowTalk] Failed to parse system message content for routing:', e);
+        }
+      }
+
       const gid = isGroup ? chatId.toLowerCase() :
         (senderId.toLowerCase() === myId ? chatId.toLowerCase() :
-          (senderId === 'system' ? chatId.toLowerCase() : senderId.toLowerCase()));
+          (senderId === 'system' ? systemGid : senderId.toLowerCase()));
 
       // 1. BLOCKING CHECK: Ignore messages from blocked contacts
       const currentChat = (chatsRef.current || []).find(c => String(c.id).toLowerCase() === gid);
@@ -1902,6 +1935,15 @@ export const AppProvider = ({ children }) => {
         setChats(prev => {
           let updated = false;
           const newChats = prev.map(chat => {
+            // Note to Self Safety Guard: A chat representing "Note to Self" must only match messages
+            // that the user sent to themselves. It should never receive messages from other users or from 'system'.
+            const isSelfChat = chat.isSelf === true || chat.id.toLowerCase() === myId || (myShadowId && chat.id.toLowerCase() === myShadowId);
+            if (isSelfChat) {
+              const isMsgToSelf = senderId.toLowerCase() === myId &&
+                                  (chatId.toLowerCase() === myId || (myShadowId && chatId.toLowerCase() === myShadowId));
+              if (!isMsgToSelf) return chat;
+            }
+
             const isMatch = chat.id.toLowerCase() === gid ||
                             (chat.contact?.id && chat.contact.id.toLowerCase() === gid) ||
                             (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === gid);
@@ -2883,6 +2925,7 @@ export const AppProvider = ({ children }) => {
         id: sysId,
         text: encrypt('Your request has been rejected.', user.id.toLowerCase()),
         senderId: 'system',
+        partnerId: user.id.toLowerCase(),
         timestamp: Date.now()
       }
     });
@@ -4277,6 +4320,7 @@ export const AppProvider = ({ children }) => {
         id: sysId,
         text: encrypt('You are no longer friends with this contact.', otherId),
         senderId: 'system',
+        partnerId: user.id.toLowerCase(),
         timestamp: Date.now()
       }
     });
