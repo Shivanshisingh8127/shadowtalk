@@ -3,6 +3,7 @@ import { supabase, supabaseUrl, supabaseAnonKey } from '../supabaseClient';
 import { Download as DownloadIcon } from 'lucide-react';
 import { callService } from '../modules/calling/CallService';
 import { useCallStore } from '../modules/calling/store';
+import { shareContent } from '../utils/shareHelper';
 
 const AppContext = createContext();
 
@@ -5212,19 +5213,13 @@ export const AppProvider = ({ children }) => {
     const appUrl = 'https://shadowtalk.app'; // Placeholder
     const inviteMessage = `🚀 Have you tried ShadowTalk yet?\n\nIt's the ultimate anonymous messaging app with zero data tracking. No phone, no email, just pure privacy.\n\nDownload it here: ${appUrl}\n\nLet's chat securely! 🔒✨`;
 
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Join me on ShadowTalk',
-          text: inviteMessage,
-          url: appUrl
-        });
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          window.open(`https://wa.me/?text=${encodeURIComponent(inviteMessage)}`, '_blank');
-        }
-      }
-    } else {
+    const res = await shareContent({
+      title: 'Join me on ShadowTalk',
+      text: inviteMessage,
+      url: appUrl
+    });
+
+    if (!res.success && res.reason === 'unsupported') {
       window.open(`https://wa.me/?text=${encodeURIComponent(inviteMessage)}`, '_blank');
       navigator.clipboard.writeText(inviteMessage);
       showToast('Invite link copied and opening WhatsApp...', 'info');

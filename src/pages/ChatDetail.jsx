@@ -45,13 +45,15 @@ import {
   Pin as PinIcon,
   Forward as ForwardIcon,
   Download as DownloadIcon,
-  Palette as PaletteIcon
+  Palette as PaletteIcon,
+  Share2 as ShareIcon
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../supabaseClient';
 import { useCallStore } from '../modules/calling/store';
 
 import { triggerHaptic } from '../utils/haptics';
+import { shareContent } from '../utils/shareHelper';
 
 const isIndefinitelyReadOnly = false;
 
@@ -1329,6 +1331,30 @@ export default function ChatDetail() {
         downloadFile(msg.media.url, msg.media.name);
       }
       setSelectedMessage(null);
+    } else if (action === 'share') {
+      setSelectedMessage(null);
+      const shareOptions = {
+        title: msg.text ? 'Share Message' : 'Share Attachment'
+      };
+      if (msg.text) {
+        shareOptions.text = msg.text;
+      }
+      if (msg.media?.url) {
+        shareOptions.mediaUrl = msg.media.url;
+        shareOptions.fileName = msg.media.name;
+        shareOptions.mimeType = msg.media.type;
+        showToast('Preparing file for sharing...', 'info');
+      }
+      shareContent(shareOptions).then((res) => {
+        if (!res.success && res.reason === 'unsupported') {
+          showToast(res.message || 'Sharing is not supported on this browser.', 'error');
+        } else if (res.success && res.reason === 'file_fallback') {
+          showToast('Shared as a link because file sharing failed.', 'info');
+        }
+      }).catch((err) => {
+        console.error('Sharing failed:', err);
+        showToast('Sharing failed: ' + (err.message || 'Unknown error'), 'error');
+      });
     }
   };
 
@@ -3038,6 +3064,9 @@ export default function ChatDetail() {
               <div className="menu-item" onClick={() => handleAction('select', selectedMessage)}>
                 <CheckCircleIcon size={20} /> Select
               </div>
+              <div className="menu-item" onClick={() => handleAction('share', selectedMessage)}>
+                <ShareIcon size={20} /> Share
+              </div>
               {selectedMessage.media && (
                 <div className="menu-item" onClick={() => handleAction('download', selectedMessage)}>
                   <DownloadIcon size={20} /> Download
@@ -3390,6 +3419,9 @@ export default function ChatDetail() {
               </button>
               <button className="btn-secondary" style={{ flex: 1, padding: '12px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }} onClick={() => { handleAction('reply', selectedMessage); setShowInfo(false); }}>
                 <ReplyIcon size={20} /> <span style={{ fontSize: '0.75rem' }}>Reply</span>
+              </button>
+              <button className="btn-secondary" style={{ flex: 1, padding: '12px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }} onClick={() => { handleAction('share', selectedMessage); setShowInfo(false); }}>
+                <ShareIcon size={20} /> <span style={{ fontSize: '0.75rem' }}>Share</span>
               </button>
               <button className="btn-secondary" style={{ flex: 1, padding: '12px', borderRadius: '12px', color: 'var(--accent-danger)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }} onClick={() => handleAction('delete', selectedMessage)}>
                 <Trash2Icon size={20} /> <span style={{ fontSize: '0.75rem' }}>Delete</span>

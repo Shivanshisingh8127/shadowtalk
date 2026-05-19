@@ -37,11 +37,13 @@ import {
   Download as DownloadIcon,
   Play as PlayIcon,
   Palette as PaletteIcon,
-  PhoneMissed as PhoneMissedIcon
+  PhoneMissed as PhoneMissedIcon,
+  Share2 as ShareIcon
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useAppContext } from '../context/AppContext';
+import { shareContent } from '../utils/shareHelper';
 
 const DefaultAvatar = ({ name, size = 40 }) => {
   const colors = [
@@ -416,6 +418,19 @@ export default function ContactProfile() {
     navigator.clipboard.writeText(displayId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShareId = async () => {
+    const inviteText = `Hey! Connect with me securely on ShadowTalk using my Account ID:\n\n${displayId}`;
+    const res = await shareContent({
+      title: 'Join me on ShadowTalk',
+      text: inviteText,
+    });
+
+    if (!res.success && res.reason === 'unsupported') {
+      handleCopyId();
+      showToast('Sharing is not supported on this browser. ID copied to clipboard!', 'info');
+    }
   };
 
   const executeDangerAction = async () => {
@@ -1646,6 +1661,12 @@ export default function ContactProfile() {
             <div className="settings-item hoverable" onClick={handleCopyId} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px' }}>
               <CopyIcon size={24} color="var(--text-muted)" />
               <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{copied ? 'Copied!' : 'Copy Account ID'}</span>
+            </div>
+          )}
+          {!isGroup && (
+            <div className="settings-item hoverable" onClick={handleShareId} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', borderTop: '1px solid var(--border-color)' }}>
+              <ShareIcon size={24} color="var(--text-muted)" />
+              <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Share Account ID</span>
             </div>
           )}
           

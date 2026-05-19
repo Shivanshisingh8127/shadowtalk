@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft as ArrowLeftIcon, X as XIcon } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { shareContent } from '../utils/shareHelper';
 
 export default function InviteFriend() {
   const navigate = useNavigate();
-  const { user } = useAppContext();
+  const { user, showToast } = useAppContext();
   const [copied, setCopied] = useState(false);
 
   const accountId = user?.id || '054ce2ff6e978f74c1d86c4ff4852678be48536e1a9321aeeb5bfffdce9247912b';
@@ -17,20 +18,19 @@ export default function InviteFriend() {
   };
 
   const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Join me on ShadowTalk',
-          text: `Hey! Connect with me securely on ShadowTalk using my Account ID:\n\n${accountId}`,
-        });
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error('Error sharing:', err);
-        }
-      }
-    } else {
+    const inviteText = `Hey! Connect with me securely on ShadowTalk using my Account ID:\n\n${accountId}`;
+    const res = await shareContent({
+      title: 'Join me on ShadowTalk',
+      text: inviteText,
+    });
+
+    if (!res.success && res.reason === 'unsupported') {
       handleCopy();
-      alert('Sharing is not supported on your current browser. Your ID has been copied to your clipboard instead!');
+      if (showToast) {
+        showToast('Sharing is not supported on this browser. ID copied to clipboard!', 'info');
+      } else {
+        alert('Sharing is not supported on your current browser. Your ID has been copied to your clipboard instead!');
+      }
     }
   };
 
