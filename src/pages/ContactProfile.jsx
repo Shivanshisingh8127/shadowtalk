@@ -1302,9 +1302,7 @@ export default function ContactProfile() {
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: 'rgba(6, 7, 10, 0.45)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          backgroundColor: 'transparent',
           minHeight: '100vh'
         }}>
           <div className="screen-header" style={{ borderBottom: 'none', justifyContent: 'flex-start', padding: '16px 20px', background: 'transparent' }}>
@@ -1447,9 +1445,7 @@ export default function ContactProfile() {
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: 'rgba(6, 7, 10, 0.45)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          backgroundColor: 'transparent',
           minHeight: '100vh'
         }}>
           <div className="screen-header" style={{ borderBottom: 'none', justifyContent: 'flex-start', padding: '16px 20px', background: 'transparent' }}>
