@@ -300,7 +300,7 @@ input, textarea {
   min-height: 100dvh;
   width: 100%;
   background-color: var(--bg-primary);
-  background-image: linear-gradient(rgba(6, 7, 10, 0.82), rgba(6, 7, 10, 0.82)), var(--global-bg-image, none);
+  background-image: var(--global-bg-image, none);
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
