@@ -79,7 +79,7 @@ export default function ContactProfile() {
   const { 
     chats, setChats, user, togglePin, updateChatSettings, updateGroupSettings,
     clearMessages, deleteChat, deleteContact, 
-    blockContact, unblockContact, showToast, startCall, addMemberToGroup, removeMemberFromGroup, leaveGroup,
+    blockContact, unblockContact, showToast, startCall, addMemberToGroup, removeMemberFromGroup, leaveGroup, deleteGroup,
     isLoading, downloadFile, bulkDeleteMessages, updateChatTheme, showConfirm
   } = useAppContext();
   
@@ -337,6 +337,9 @@ export default function ContactProfile() {
         navigate('/chats');
       } else if (confirmAction === 'leave_group') {
         await leaveGroup(id);
+        navigate('/chats');
+      } else if (confirmAction === 'delete_group_admin') {
+        await deleteGroup(id);
         navigate('/chats');
       }
     } catch (err) {
@@ -1531,22 +1534,34 @@ export default function ContactProfile() {
           )}
 
           {isGroup && (
-            <div className="settings-item hoverable" 
-              onClick={() => setConfirmAction(chat.status === 'removed' ? 'delete_group' : 'leave_group')} 
-              style={{ display: 'flex', alignItems: 'center', borderBottom: 'none', padding: '16px' }}
-            >
-              {chat.status === 'removed' ? (
-                <>
+            <>
+              <div className="settings-item hoverable" 
+                onClick={() => setConfirmAction(chat.status === 'removed' ? 'delete_group' : 'leave_group')} 
+                style={{ display: 'flex', alignItems: 'center', borderBottom: (isAdmin && chat.status !== 'removed') ? '1px solid var(--border-color)' : 'none', padding: '16px' }}
+              >
+                {chat.status === 'removed' ? (
+                  <>
+                    <Trash2Icon size={24} color="#ff4444" />
+                    <span style={{ color: '#ff4444', fontSize: '1.1rem', fontWeight: 600, marginLeft: '12px' }}>Delete Group Chat</span>
+                  </>
+                ) : (
+                  <>
+                    <LogOutIcon size={24} color="#ff4444" />
+                    <span style={{ color: '#ff4444', fontSize: '1.1rem', fontWeight: 600, marginLeft: '12px' }}>Leave Group</span>
+                  </>
+                )}
+              </div>
+
+              {isAdmin && chat.status !== 'removed' && (
+                <div className="settings-item hoverable" 
+                  onClick={() => setConfirmAction('delete_group_admin')} 
+                  style={{ display: 'flex', alignItems: 'center', borderBottom: 'none', padding: '16px' }}
+                >
                   <Trash2Icon size={24} color="#ff4444" />
-                  <span style={{ color: '#ff4444', fontSize: '1.1rem', fontWeight: 600, marginLeft: '12px' }}>Delete Group Chat</span>
-                </>
-              ) : (
-                <>
-                  <LogOutIcon size={24} color="#ff4444" />
-                  <span style={{ color: '#ff4444', fontSize: '1.1rem', fontWeight: 600, marginLeft: '12px' }}>Leave Group</span>
-                </>
+                  <span style={{ color: '#ff4444', fontSize: '1.1rem', fontWeight: 600, marginLeft: '12px' }}>Delete Group</span>
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
 
@@ -1656,20 +1671,23 @@ export default function ContactProfile() {
                   {confirmAction === 'block' && 'Block Contact?'}
                   {confirmAction === 'delete_contact' && 'Delete Contact?'}
                   {confirmAction === 'leave_group' && 'Leave Group?'}
+                  {confirmAction === 'delete_group_admin' && 'Delete Group?'}
                 </>
               )}
             </h3>
             <p style={{ color: '#aaa', fontSize: '0.95rem', marginBottom: '24px', textAlign: 'center', lineHeight: '1.5' }}>
               {confirmAction.type === 'restricted' ? confirmAction.message : (
-                confirmAction === 'delete_contact' 
-                  ? 'Are you sure you want to remove this friend? Both users will be unable to send new messages, and the chat will become read-only.'
-                  : 'Are you sure you want to proceed with this action? This cannot be undone.'
+                confirmAction === 'delete_group_admin'
+                  ? 'Are you sure you want to delete this group? This action cannot be undone.'
+                  : confirmAction === 'delete_contact' 
+                    ? 'Are you sure you want to remove this friend? Both users will be unable to send new messages, and the chat will become read-only.'
+                    : 'Are you sure you want to proceed with this action? This cannot be undone.'
               )}
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button 
                 className="btn-primary" 
-                style={{ flex: 1, backgroundColor: confirmAction === 'block' || confirmAction === 'delete' || confirmAction === 'delete_contact' || confirmAction === 'delete_group' ? '#ff4444' : 'var(--accent-primary)', color: confirmAction === 'block' || confirmAction === 'delete' || confirmAction === 'delete_contact' || confirmAction === 'delete_group' ? '#fff' : '#000' }}
+                style={{ flex: 1, backgroundColor: confirmAction === 'block' || confirmAction === 'delete' || confirmAction === 'delete_contact' || confirmAction === 'delete_group' || confirmAction === 'delete_group_admin' ? '#ff4444' : 'var(--accent-primary)', color: confirmAction === 'block' || confirmAction === 'delete' || confirmAction === 'delete_contact' || confirmAction === 'delete_group' || confirmAction === 'delete_group_admin' ? '#fff' : '#000' }}
                 onClick={() => {
                   if (confirmAction.type === 'restricted') {
                     setConfirmAction(null);

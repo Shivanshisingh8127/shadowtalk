@@ -1301,6 +1301,31 @@ export const AppProvider = ({ children }) => {
       }));
     });
 
+    // 1.3 Group Deletion Broadcast
+    chatSub.on('broadcast', { event: 'GROUP_DELETED' }, (payload) => {
+      const { groupId } = payload.payload;
+      console.log(`[ShadowTalk] Real-time group deletion received for ${groupId}`);
+
+      const canonicalGroupId = String(groupId).toLowerCase().trim();
+
+      // Remove group from all members' chat lists/dashboards
+      setChats(prev => prev.filter(c => String(c.id).toLowerCase().trim() !== canonicalGroupId));
+
+      // Safe redirection for users currently on the chat or settings screen
+      const currentActiveChatId = activeChatIdRef.current || activeChatId;
+      if (currentActiveChatId && String(currentActiveChatId).toLowerCase().trim() === canonicalGroupId) {
+        setActiveChatId(null);
+        showToast('This group was deleted by the admin', 'info');
+        window.location.hash = '#/chats';
+      } else {
+        const currentHash = window.location.hash.toLowerCase();
+        if (currentHash.includes(canonicalGroupId)) {
+          showToast('This group was deleted by the admin', 'info');
+          window.location.hash = '#/chats';
+        }
+      }
+    });
+
     // 1.5 Global Privacy Broadcast Listener (Merged into main chatSub)
     chatSub.on('broadcast', { event: 'profile_update' }, (payload) => {
         const { userId, shadowId, updates } = payload.payload;
@@ -4378,6 +4403,74 @@ export const AppProvider = ({ children }) => {
     showToast('Contact removed');
   };
 
+  const deleteGroup = async (groupId) => {
+    if (!user?.id || !groupId) return;
+    try {
+      const canonicalGroupId = groupId.toLowerCase().trim();
+      console.log('[ShadowTalk] deleteGroup attempting for:', canonicalGroupId);
+
+      const targetChat = chats.find(c => String(c.id).toLowerCase().trim() === canonicalGroupId);
+      if (!targetChat) {
+        console.warn('[ShadowTalk] Group not found in local state:', canonicalGroupId);
+        showToast('Group not found', 'error');
+        return;
+      }
+
+      // SECURITY: Validate group ownership/admin role frontend-side
+      if (targetChat.adminId !== user.id) {
+        console.warn('[ShadowTalk] Security Block: Non-admin attempted to delete group', canonicalGroupId);
+        showToast('Only admins can delete this group', 'error');
+        return;
+      }
+
+      // 1. Delete ALL group member rows from the chats table
+      // SECURITY: Validate group ownership/admin role server-side in PostgREST
+      console.log('[ShadowTalk] Deleting group chats records from DB...');
+      const { error: dbError } = await supabase
+        .from('chats')
+        .delete()
+        .eq('chat_id', canonicalGroupId)
+        .filter('chat_data->>adminId', 'eq', user.id);
+
+      if (dbError) {
+        console.error('[ShadowTalk] Failed to delete group records from DB:', dbError);
+        throw new Error(dbError.message || 'Failed to delete group from database');
+      }
+
+      // 2. Delete all group messages from the messages table
+      console.log('[ShadowTalk] Deleting group messages from DB...');
+      const { error: msgError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('chat_id', canonicalGroupId);
+
+      if (msgError) {
+        console.warn('[ShadowTalk] Group message deletion warning:', msgError);
+      }
+
+      // 3. Broadcast GROUP_DELETED event instantly to all connected members
+      if (chatSubRef.current) {
+        console.log('[ShadowTalk] Broadcasting GROUP_DELETED event for group:', canonicalGroupId);
+        chatSubRef.current.send({
+          type: 'broadcast',
+          event: 'GROUP_DELETED',
+          payload: {
+            groupId: canonicalGroupId
+          }
+        });
+      }
+
+      // 4. Remove the group locally from current admin's dashboard/chat list
+      setChats(prev => prev.filter(c => String(c.id).toLowerCase().trim() !== canonicalGroupId));
+
+      showToast('Group deleted successfully', 'success');
+    } catch (err) {
+      console.error('[ShadowTalk] deleteGroup fatal error:', err);
+      showToast(err.message || 'Failed to delete group', 'error');
+      throw err;
+    }
+  };
+
   const leaveGroup = async (groupId) => {
     if (!user?.id) return;
     try {
@@ -5129,7 +5222,7 @@ export const AppProvider = ({ children }) => {
     globalWallpaper, setGlobalWallpaper,
     followSystem, setFollowSystem,
     chats, setChats, addMessage, editMessage, toggleReaction, createGroup, deleteMessage, bulkDeleteMessages, clearMessages, deleteChat, deleteContact,
-    blockContact, unblockContact, deleteContact, leaveGroup, rejoinGroup, addMemberToGroup, removeMemberFromGroup, markAsRead, togglePin, updateChatSettings, updateGroupSettings,
+    blockContact, unblockContact, deleteContact, deleteGroup, leaveGroup, rejoinGroup, addMemberToGroup, removeMemberFromGroup, markAsRead, togglePin, updateChatSettings, updateGroupSettings,
     broadcastProfileUpdate,
     forwardMessage, toggleStarMessage, togglePinMessage, archiveChat, setTypingStatus, typingUsers,
     updateChatTheme,
