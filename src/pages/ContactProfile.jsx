@@ -79,7 +79,7 @@ export default function ContactProfile() {
   const { 
     chats, setChats, user, togglePin, updateChatSettings, updateGroupSettings,
     clearMessages, deleteChat, deleteContact, 
-    blockContact, unblockContact, showToast, startCall, addMemberToGroup, removeMemberFromGroup, leaveGroup, deleteGroup,
+    blockContact, unblockContact, showToast, startCall, addMemberToGroup, removeMemberFromGroup, promoteMemberToAdmin, leaveGroup, deleteGroup,
     isLoading, downloadFile, bulkDeleteMessages, updateChatTheme, showConfirm
   } = useAppContext();
   
@@ -92,6 +92,7 @@ export default function ContactProfile() {
   const [isUploadingPic, setIsUploadingPic] = useState(false);
   const [previewMedia, setPreviewMedia] = useState(null);
   const [showThemeModal, setShowThemeModal] = useState(false);
+  const [promoteSearchQuery, setPromoteSearchQuery] = useState('');
   const avatarInputRef = useRef(null);
   const wallpaperInputRef = useRef(null);
 
@@ -122,6 +123,7 @@ export default function ContactProfile() {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [addMemberId, setAddMemberId] = useState('');
   const [selectedMemberInfo, setSelectedMemberInfo] = useState(null);
+  const [adminSearchQuery, setAdminSearchQuery] = useState('');
 
   // Media Gallery Logic
   const allMediaMessages = chat?.messages?.filter(m => m.media && (m.media.type === 'image' || m.media.type === 'video')) || [];
@@ -1293,6 +1295,193 @@ export default function ContactProfile() {
     );
   }
 
+  if (activeView === 'manage_admins' && isGroup && isAdmin) {
+    return (
+      <div className="app-container animate-fade-in" style={{ backgroundColor: '#000', color: '#fff', display: 'flex', flexDirection: 'column' }}>
+        <div className="screen-header" style={{ borderBottom: 'none', justifyContent: 'flex-start', padding: '16px 20px' }}>
+          <button className="icon-btn hoverable" onClick={() => setActiveView('main')} style={{ margin: '0', padding: '0', color: '#fff' }}>
+            <ArrowLeftIcon size={24} />
+          </button>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0 16px' }}>Manage Admins</h1>
+        </div>
+
+        <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
+          <p style={{ color: '#aaa', fontSize: '0.9rem', textAlign: 'center', marginBottom: '24px', padding: '0 16px' }}>
+            Admins cannot be demoted or removed from the group.
+          </p>
+
+          <button 
+            className="hoverable"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px',
+              backgroundColor: '#1a1a1a', borderRadius: '16px', width: '100%',
+              border: 'none', cursor: 'pointer', marginBottom: '24px'
+            }}
+            onClick={() => setActiveView('promote_members')}
+          >
+            <div style={{ display: 'flex', position: 'relative' }}>
+              <CrownIcon size={24} color="#fff" />
+              <div style={{ position: 'absolute', bottom: -4, right: -4, backgroundColor: '#1a1a1a', borderRadius: '50%' }}>
+                <PlusIcon size={12} color="#fff" />
+              </div>
+            </div>
+            <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#fff' }}>Promote Members</span>
+          </button>
+
+          <h3 style={{ fontSize: '0.9rem', color: '#aaa', marginBottom: '16px', marginLeft: '4px' }}>Admins</h3>
+          
+          <div style={{ position: 'relative', marginBottom: '20px' }}>
+            <SearchIcon size={20} color="#888" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input 
+              type="text" 
+              placeholder="Search" 
+              style={{
+                width: '100%', padding: '12px 16px 12px 48px',
+                backgroundColor: '#1a1a1a', border: 'none',
+                borderRadius: '12px', color: '#fff',
+                fontSize: '1rem'
+              }}
+              value={adminSearchQuery}
+              onChange={(e) => setAdminSearchQuery(e.target.value)}
+            />
+            {adminSearchQuery && (
+              <button 
+                className="icon-btn" 
+                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', padding: '4px' }}
+                onClick={() => setAdminSearchQuery('')}
+              >
+                <XIcon size={16} color="#888" />
+              </button>
+            )}
+          </div>
+
+          <div className="settings-section" style={{ padding: 0 }}>
+            {(chat.members || [])
+              .filter(m => (m.role === 'admin' || m.id === chat.adminId) && m.name.toLowerCase().includes(adminSearchQuery.toLowerCase()))
+              .map(admin => {
+                const isMe = admin.id === user?.id;
+                return (
+                  <div key={admin.id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px 0' }}>
+                    <div className="avatar" style={{ position: 'relative', width: 48, height: 48, borderRadius: '50%', overflow: 'visible' }}>
+                      <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden' }}>
+                        {(isMe ? user?.avatarUrl : admin.avatarUrl) ? (
+                          <img src={isMe ? user.avatarUrl : admin.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <DefaultAvatar name={admin.name} size={48} />
+                        )}
+                      </div>
+                      <div style={{ 
+                        position: 'absolute', bottom: -2, right: -2, 
+                        backgroundColor: '#FFD700', borderRadius: '50%', 
+                        padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '2px solid #000'
+                      }}>
+                        <CrownIcon size={12} color="#000" fill="#000" />
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#fff' }}>
+                      {admin.name} {isMe && '(You)'}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeView === 'promote_members' && isGroup && isAdmin) {
+    return (
+      <div className="app-container animate-fade-in" style={{ backgroundColor: '#000', color: '#fff', display: 'flex', flexDirection: 'column' }}>
+        <div className="screen-header" style={{ borderBottom: 'none', justifyContent: 'flex-start', padding: '16px 20px' }}>
+          <button className="icon-btn hoverable" onClick={() => setActiveView('manage_admins')} style={{ margin: '0', padding: '0', color: '#fff' }}>
+            <ArrowLeftIcon size={24} />
+          </button>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0 16px' }}>Promote Members</h1>
+        </div>
+
+        <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', marginBottom: '20px' }}>
+            <SearchIcon size={20} color="#888" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input 
+              type="text" 
+              placeholder="Search members to promote" 
+              style={{
+                width: '100%', padding: '12px 16px 12px 48px',
+                backgroundColor: '#1a1a1a', border: 'none',
+                borderRadius: '12px', color: '#fff',
+                fontSize: '1rem'
+              }}
+              value={promoteSearchQuery}
+              onChange={(e) => setPromoteSearchQuery(e.target.value)}
+            />
+            {promoteSearchQuery && (
+              <button 
+                className="icon-btn" 
+                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', padding: '4px' }}
+                onClick={() => setPromoteSearchQuery('')}
+              >
+                <XIcon size={16} color="#888" />
+              </button>
+            )}
+          </div>
+
+          <div className="settings-section" style={{ padding: 0 }}>
+            {(chat.members || [])
+              .filter(m => !(m.role === 'admin' || m.id === chat.adminId) && m.name.toLowerCase().includes(promoteSearchQuery.toLowerCase()))
+              .map(member => {
+                return (
+                  <div 
+                    key={member.id} 
+                    className="hoverable" 
+                    onClick={async () => {
+                      const confirmed = await showConfirm({
+                        title: 'Promote to Admin?',
+                        message: `Are you sure you want to promote ${member.name} to Admin?`,
+                        icon: CrownIcon
+                      });
+                      if (confirmed) {
+                        await promoteMemberToAdmin(id, member.id);
+                        setActiveView('manage_admins');
+                      }
+                    }}
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '16px', 
+                      padding: '12px 16px', 
+                      cursor: 'pointer',
+                      borderRadius: '12px',
+                      marginBottom: '8px',
+                      backgroundColor: 'rgba(255,255,255,0.02)'
+                    }}
+                  >
+                    <div className="avatar" style={{ width: 44, height: 44, borderRadius: '50%', overflow: 'hidden' }}>
+                      {member.avatarUrl ? (
+                        <img src={member.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <DefaultAvatar name={member.name} size={44} />
+                      )}
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 600, color: '#fff' }}>{member.name}</span>
+                      <span style={{ fontSize: '0.8rem', color: '#888' }}>{member.shadowId || member.name}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            {(chat.members || []).filter(m => !(m.role === 'admin' || m.id === chat.adminId) && m.name.toLowerCase().includes(promoteSearchQuery.toLowerCase())).length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#888' }}>
+                No members available to promote.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="app-container animate-fade-in" style={{ backgroundColor: 'var(--bg-primary)', overflowY: 'auto' }}>
@@ -1482,6 +1671,20 @@ export default function ContactProfile() {
                   left: localAllowDMs ? '21px' : '3px', transition: 'all 0.3s'
                 }} />
               </div>
+            </div>
+          )}
+
+          {isGroup && isAdmin && (
+            <div 
+              className="settings-item hoverable" 
+              onClick={() => setActiveView('manage_admins')} 
+              style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', borderBottom: '1px solid var(--border-color)' }}
+            >
+              <CrownIcon size={24} color="#ccc" />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Manage Admins</span>
+              </div>
+              <ChevronRightIcon size={20} color="var(--text-muted)" />
             </div>
           )}
 

@@ -4958,6 +4958,118 @@ export const AppProvider = ({ children }) => {
     showToast(`${memberToRemove.name} removed from group`);
   };
 
+  const promoteMemberToAdmin = async (groupId, memberId) => {
+    if (!user?.id) return;
+    const canonicalGroupId = groupId.toLowerCase();
+    const targetChat = chats.find(c => c.id.toLowerCase() === canonicalGroupId);
+
+    if (!targetChat || targetChat.adminId !== user.id) {
+      showToast('Only admin can promote members', 'error');
+      return;
+    }
+
+    const memberToPromote = (targetChat.members || []).find(m =>
+      m && (String(m.id).toLowerCase() === String(memberId).toLowerCase() || String(m.shadowId).toLowerCase() === String(memberId).toLowerCase())
+    );
+    if (!memberToPromote) return;
+
+    const updatedMembers = (targetChat.members || []).map(m => {
+      if (m && (String(m.id).toLowerCase() === String(memberId).toLowerCase() || String(m.shadowId).toLowerCase() === String(memberId).toLowerCase())) {
+        return { ...m, role: 'admin' };
+      }
+      return m;
+    });
+
+    const systemMsg = {
+      id: `m_${Date.now()}`,
+      text: `${memberToPromote.name} was promoted to Admin by ${user.name}`,
+      senderId: 'system',
+      type: 'notification',
+      timestamp: Date.now()
+    };
+
+    // 1. Update LOCAL state immediately for instant feedback
+    setChats(prev => prev.map(c => {
+      if (String(c.id).toLowerCase().trim() === canonicalGroupId) {
+        return {
+          ...c,
+          members: updatedMembers,
+          messages: [...(c.messages || []), systemMsg]
+        };
+      }
+      return c;
+    }));
+
+    const updatedGroupMetadata = {
+      ...targetChat,
+      members: updatedMembers,
+      messages: [], // DB blob stays empty
+      lastActivity: Date.now()
+    };
+
+    // 1. Save system message FIRST to get the official Server-Side Timestamp
+    const { data: sysMsgData, error: sysMsgError } = await supabase.from('messages').insert({
+      id: systemMsg.id,
+      chat_id: canonicalGroupId,
+      sender_id: user.id.toLowerCase(),
+      content: { ...systemMsg, text: encrypt(systemMsg.text, canonicalGroupId) }
+    }).select('created_at').single();
+
+    if (sysMsgError) {
+      console.error('[ShadowTalk] Failed to insert promotion system message:', sysMsgError);
+      showToast('Failed to promote member', 'error');
+      return;
+    }
+
+    const serverPromoTime = new Date(sysMsgData.created_at).getTime();
+
+    // 2. Update remaining members' rows in DB (non-blocking)
+    const updatePromises = updatedMembers.map(async (m) => {
+      try {
+        const { data: existing } = await supabase
+          .from('chats')
+          .select('chat_data')
+          .eq('owner_id', m.id.toLowerCase()) // Normalize
+          .eq('chat_id', canonicalGroupId)
+          .maybeSingle();
+
+        const baseChat = existing?.chat_data || updatedGroupMetadata;
+        await supabase.from('chats').upsert({
+          owner_id: m.id.toLowerCase(), // Normalize
+          chat_id: canonicalGroupId,
+          chat_data: { ...baseChat, members: updatedMembers, messages: [], lastActivity: Date.now() }
+        }, { onConflict: 'owner_id, chat_id' });
+      } catch (e) {
+        console.error('[ShadowTalk] Background sync failed for member:', m.id, e);
+      }
+    });
+
+    // 3. Save system message and trigger background work
+    Promise.all([
+      supabase.from('messages').insert({
+        chat_id: canonicalGroupId,
+        content: { ...systemMsg, text: encrypt(systemMsg.text, canonicalGroupId) }
+      }),
+      ...updatePromises
+    ]).catch(err => console.error('[ShadowTalk] Post-promotion sync error:', err));
+
+    // 6. Broadcast for instant UI update
+    if (chatSubRef.current) {
+      chatSubRef.current.send({
+        type: 'broadcast',
+        event: 'GROUP_SYNC',
+        payload: {
+          groupId: canonicalGroupId,
+          members: updatedMembers,
+          lastActivity: serverPromoTime,
+          type: 'member_promoted'
+        }
+      });
+    }
+
+    showToast(`${memberToPromote.name} promoted to Admin`);
+  };
+
   async function syncMissedMessages() {
     if (!user?.id || !navigator.onLine) return;
     console.log('[ShadowTalk] Syncing missed messages...');
@@ -5222,7 +5334,7 @@ export const AppProvider = ({ children }) => {
     globalWallpaper, setGlobalWallpaper,
     followSystem, setFollowSystem,
     chats, setChats, addMessage, editMessage, toggleReaction, createGroup, deleteMessage, bulkDeleteMessages, clearMessages, deleteChat, deleteContact,
-    blockContact, unblockContact, deleteContact, deleteGroup, leaveGroup, rejoinGroup, addMemberToGroup, removeMemberFromGroup, markAsRead, togglePin, updateChatSettings, updateGroupSettings,
+    blockContact, unblockContact, deleteContact, deleteGroup, leaveGroup, rejoinGroup, addMemberToGroup, removeMemberFromGroup, promoteMemberToAdmin, markAsRead, togglePin, updateChatSettings, updateGroupSettings,
     broadcastProfileUpdate,
     forwardMessage, toggleStarMessage, togglePinMessage, archiveChat, setTypingStatus, typingUsers,
     updateChatTheme,
