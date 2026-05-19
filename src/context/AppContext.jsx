@@ -247,6 +247,9 @@ export const AppProvider = ({ children }) => {
   // Real-time Presence Tracking
   const presenceChannelRef = useRef(null);
   const offlineTimeoutRef = useRef({});
+  const heartbeatTimestampsRef = useRef({});
+  const pingIntervalRef = useRef(null);
+  const monitorIntervalRef = useRef(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -274,12 +277,15 @@ export const AppProvider = ({ children }) => {
         .on('presence', { event: 'sync' }, () => {
           const state = channel.presenceState();
           const activeIds = new Set();
+          const now = Date.now();
           Object.entries(state).forEach(([key, presenceItems]) => {
             activeIds.add(key.toLowerCase());
+            heartbeatTimestampsRef.current[key.toLowerCase()] = now;
             if (Array.isArray(presenceItems)) {
               presenceItems.forEach(item => {
                 if (item.shadowId) {
                   activeIds.add(item.shadowId.toLowerCase());
+                  heartbeatTimestampsRef.current[item.shadowId.toLowerCase()] = now;
                 }
               });
             }
@@ -381,6 +387,14 @@ export const AppProvider = ({ children }) => {
           }
         });
 
+      channel.on('broadcast', { event: 'ping' }, (payload) => {
+        if (!payload.payload) return;
+        const { userId, shadowId } = payload.payload;
+        const now = Date.now();
+        if (userId) heartbeatTimestampsRef.current[userId.toLowerCase()] = now;
+        if (shadowId) heartbeatTimestampsRef.current[shadowId.toLowerCase()] = now;
+      });
+
       channel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({
@@ -389,6 +403,26 @@ export const AppProvider = ({ children }) => {
           });
           // Update our own self presence when we come online
           updateSelfPresence(false);
+
+          if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+          pingIntervalRef.current = setInterval(() => {
+            if (presenceChannelRef.current && navigator.onLine) {
+              presenceChannelRef.current.send({
+                type: 'broadcast',
+                event: 'ping',
+                payload: { userId: myIdLower, shadowId: user.shadowId }
+              }).catch(() => {});
+            }
+          }, 10000);
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          const offlineTime = Date.now();
+          setOnlineUsers(new Set());
+          setChats(prev => prev.map(chat => {
+            if (chat.type === 'direct' && chat.contact && chat.contact.isOnline) {
+              return { ...chat, contact: { ...chat.contact, isOnline: false, lastSeen: offlineTime } };
+            }
+            return chat;
+          }));
         }
       });
 
@@ -436,6 +470,44 @@ export const AppProvider = ({ children }) => {
     initPresence();
     syncContactsLastSeen(chatsRef.current);
 
+    if (monitorIntervalRef.current) clearInterval(monitorIntervalRef.current);
+    monitorIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      let changedIds = [];
+      const currentOnline = new Set(onlineUsersRef.current);
+      
+      currentOnline.forEach(id => {
+        const lastBeat = heartbeatTimestampsRef.current[id];
+        // Stale if no heartbeat for 30s
+        if (lastBeat && (now - lastBeat) > 30000) {
+          changedIds.push(id);
+          delete heartbeatTimestampsRef.current[id];
+        }
+      });
+
+      if (changedIds.length > 0) {
+        setOnlineUsers(prev => {
+          const updated = new Set(prev);
+          changedIds.forEach(id => updated.delete(id));
+          return updated;
+        });
+        
+        setChats(prev => prev.map(chat => {
+          if (chat.type === 'direct' && chat.contact) {
+            const contactIdLower = chat.contact.id?.toLowerCase();
+            const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+            if ((contactIdLower && changedIds.includes(contactIdLower)) ||
+                (contactShadowIdLower && changedIds.includes(contactShadowIdLower))) {
+              if (chat.contact.isOnline) {
+                return { ...chat, contact: { ...chat.contact, isOnline: false, lastSeen: now } };
+              }
+            }
+          }
+          return chat;
+        }));
+      }
+    }, 5000);
+
     // Run a periodic heartbeat every 60 seconds to refresh our self presence
     const heartbeat = setInterval(() => {
       updateSelfPresence(false);
@@ -446,6 +518,8 @@ export const AppProvider = ({ children }) => {
       window.removeEventListener('pagehide', handleUnload);
       window.removeEventListener('beforeunload', handleUnload);
       clearInterval(heartbeat);
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      if (monitorIntervalRef.current) clearInterval(monitorIntervalRef.current);
       destroyPresence(false);
     };
   }, [user?.id]);
