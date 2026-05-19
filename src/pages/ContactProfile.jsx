@@ -1649,7 +1649,7 @@ export default function ContactProfile() {
             </div>
           )}
           
-          {true && (
+          {(!isGroup || !isAdmin) && (
             <div className="settings-item hoverable" onClick={() => setActiveView('disappearing')} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px' }}>
               <TimerIcon size={24} color="var(--text-muted)" />
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -1694,24 +1694,19 @@ export default function ContactProfile() {
             <ChevronRightIcon size={20} color="var(--text-muted)" />
           </div>
 
-          {isGroup && (
+          {isGroup && !isAdmin && (
             <div 
-              className={`settings-item ${isAdmin ? 'hoverable' : ''}`} 
-              onClick={isAdmin ? handleToggleDMs : null} 
+              className="settings-item" 
               style={{ 
                 gap: '16px', padding: '16px', borderBottom: '1px solid var(--border-color)', 
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                cursor: isAdmin ? 'pointer' : 'default',
-                opacity: isAdmin ? 1 : 0.5
+                opacity: 0.5
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-                <ShieldIcon size={24} color={localAllowDMs ? "var(--accent-primary)" : "var(--text-muted)"} />
+                <ShieldIcon size={24} color="var(--text-muted)" />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Allow Member DMs</span>
-                    {isUpdatingDMs && <div className="spinner" style={{ width: 14, height: 14, borderWidth: '2px' }} />}
-                  </div>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Allow Member DMs</span>
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     {localAllowDMs ? 'Members can message each other' : 'Direct messages between members are disabled'}
                   </span>
@@ -1722,29 +1717,15 @@ export default function ContactProfile() {
                 style={{
                   width: '40px', height: '22px', borderRadius: '11px',
                   backgroundColor: localAllowDMs ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)',
-                  position: 'relative', transition: 'all 0.3s'
+                  position: 'relative'
                 }}
               >
                 <div style={{
                   width: '16px', height: '16px', borderRadius: '50%',
                   backgroundColor: '#fff', position: 'absolute', top: '3px',
-                  left: localAllowDMs ? '21px' : '3px', transition: 'all 0.3s'
+                  left: localAllowDMs ? '21px' : '3px'
                 }} />
               </div>
-            </div>
-          )}
-
-          {isGroup && isAdmin && (
-            <div 
-              className="settings-item hoverable" 
-              onClick={() => setActiveView('manage_admins')} 
-              style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', borderBottom: '1px solid var(--border-color)' }}
-            >
-              <CrownIcon size={24} color="#ccc" />
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Manage Admins</span>
-              </div>
-              <ChevronRightIcon size={20} color="var(--text-muted)" />
             </div>
           )}
 
@@ -1767,6 +1748,88 @@ export default function ContactProfile() {
             <ChevronRightIcon size={20} color="var(--text-muted)" />
           </div>
         </div>
+
+        {isGroup && isAdmin && (
+          <>
+            <div style={{ 
+              fontSize: '0.85rem', 
+              fontWeight: 700, 
+              textTransform: 'uppercase', 
+              letterSpacing: '1px', 
+              color: 'var(--text-muted)', 
+              marginTop: '16px', 
+              marginBottom: '10px',
+              paddingLeft: '8px'
+            }}>
+              Admin Settings
+            </div>
+            <div className="glass-box" style={{ padding: 0, border: 'none', borderRadius: '24px', overflow: 'hidden' }}>
+              
+              <div 
+                className="settings-item hoverable" 
+                onClick={() => setActiveView('manage_admins')} 
+                style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', borderBottom: '1px solid var(--border-color)' }}
+              >
+                <CrownIcon size={24} color="#ccc" />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Manage Admins</span>
+                </div>
+                <ChevronRightIcon size={20} color="var(--text-muted)" />
+              </div>
+
+              <div 
+                className="settings-item hoverable" 
+                onClick={handleToggleDMs} 
+                style={{ 
+                  gap: '16px', padding: '16px', borderBottom: '1px solid var(--border-color)', 
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+                  <ShieldIcon size={24} color={localAllowDMs ? "var(--accent-primary)" : "var(--text-muted)"} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Allow Member DMs</span>
+                      {isUpdatingDMs && <div className="spinner" style={{ width: 14, height: 14, borderWidth: '2px' }} />}
+                    </div>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      {localAllowDMs ? 'Members can message each other' : 'Direct messages between members are disabled'}
+                    </span>
+                  </div>
+                </div>
+                <div 
+                  className={`toggle-switch ${localAllowDMs ? 'active' : ''}`} 
+                  style={{
+                    width: '40px', height: '22px', borderRadius: '11px',
+                    backgroundColor: localAllowDMs ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)',
+                    position: 'relative', transition: 'all 0.3s'
+                  }}
+                >
+                  <div style={{
+                    width: '16px', height: '16px', borderRadius: '50%',
+                    backgroundColor: '#fff', position: 'absolute', top: '3px',
+                    left: localAllowDMs ? '21px' : '3px', transition: 'all 0.3s'
+                  }} />
+                </div>
+              </div>
+
+              <div 
+                className="settings-item hoverable" 
+                onClick={() => setActiveView('disappearing')} 
+                style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', borderBottom: 'none' }}
+              >
+                <TimerIcon size={24} color="var(--text-muted)" />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Disappearing Messages</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{disappearingState}</span>
+                </div>
+                <ChevronRightIcon size={20} color="var(--text-muted)" />
+              </div>
+
+            </div>
+          </>
+        )}
 
         {/* Danger Zone */}
         <div className="glass-box" style={{ padding: 0, marginTop: '16px', border: 'none', borderRadius: '24px', overflow: 'hidden' }}>
