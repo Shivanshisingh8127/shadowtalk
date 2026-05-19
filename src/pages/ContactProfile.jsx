@@ -1309,7 +1309,7 @@ export default function ContactProfile() {
             <button className="icon-btn hoverable" onClick={() => setActiveView('main')} style={{ margin: '0', padding: '0', color: '#fff' }}>
               <ArrowLeftIcon size={24} />
             </button>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0 16px' }}>Manage Admins</h1>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0 16px', color: 'var(--accent-primary)' }}>Manage Admins</h1>
           </div>
 
           <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
@@ -1756,7 +1756,7 @@ export default function ContactProfile() {
               fontWeight: 700, 
               textTransform: 'uppercase', 
               letterSpacing: '1px', 
-              color: 'var(--text-muted)', 
+              color: 'var(--accent-primary)', 
               marginTop: '16px', 
               marginBottom: '10px',
               paddingLeft: '8px'
