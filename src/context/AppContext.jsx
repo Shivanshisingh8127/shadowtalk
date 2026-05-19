@@ -278,14 +278,44 @@ export const AppProvider = ({ children }) => {
           const state = channel.presenceState();
           const activeIds = new Set();
           const now = Date.now();
+          
           Object.entries(state).forEach(([key, presenceItems]) => {
-            activeIds.add(key.toLowerCase());
-            heartbeatTimestampsRef.current[key.toLowerCase()] = now;
+            const keyLower = key.toLowerCase();
+            let newestOnlineAt = 0;
+            
+            if (Array.isArray(presenceItems)) {
+              presenceItems.forEach(item => {
+                if (item.online_at) {
+                  const t = new Date(item.online_at).getTime();
+                  if (t > newestOnlineAt) newestOnlineAt = t;
+                }
+              });
+            }
+            
+            const lastBeat = heartbeatTimestampsRef.current[keyLower];
+            const isStale = lastBeat && lastBeat > 1 && (now - lastBeat) > 30000;
+            const isRecentJoin = newestOnlineAt && (now - newestOnlineAt) < 15000;
+            
+            if (isRecentJoin || (!isStale && lastBeat !== 1)) {
+              activeIds.add(keyLower);
+              if (!heartbeatTimestampsRef.current[keyLower] || isRecentJoin) {
+                heartbeatTimestampsRef.current[keyLower] = now;
+              }
+            }
+
             if (Array.isArray(presenceItems)) {
               presenceItems.forEach(item => {
                 if (item.shadowId) {
-                  activeIds.add(item.shadowId.toLowerCase());
-                  heartbeatTimestampsRef.current[item.shadowId.toLowerCase()] = now;
+                  const shadowLower = item.shadowId.toLowerCase();
+                  const shadowLastBeat = heartbeatTimestampsRef.current[shadowLower];
+                  const shadowIsStale = shadowLastBeat && shadowLastBeat > 1 && (now - shadowLastBeat) > 30000;
+                  
+                  if (isRecentJoin || (!shadowIsStale && shadowLastBeat !== 1)) {
+                    activeIds.add(shadowLower);
+                    if (!heartbeatTimestampsRef.current[shadowLower] || isRecentJoin) {
+                      heartbeatTimestampsRef.current[shadowLower] = now;
+                    }
+                  }
                 }
               });
             }
@@ -310,10 +340,14 @@ export const AppProvider = ({ children }) => {
               const isContactOnline = (contactIdLower && activeIds.has(contactIdLower)) ||
                                       (contactShadowIdLower && activeIds.has(contactShadowIdLower));
               if (chat.contact.isOnline !== isContactOnline) {
-                return {
+                const updated = {
                   ...chat,
                   contact: { ...chat.contact, isOnline: isContactOnline }
                 };
+                if (!isContactOnline) {
+                  updated.contact.lastSeen = Date.now();
+                }
+                return updated;
               }
             }
             return chat;
@@ -332,58 +366,72 @@ export const AppProvider = ({ children }) => {
               clearTimeout(offlineTimeoutRef.current[keyLower]);
             }
             
-            // Debounce offline updates by 3 seconds to eliminate network fluctuation
-            offlineTimeoutRef.current[keyLower] = setTimeout(() => {
-              const lastSeenTime = Date.now();
-              
-              setChats(prev => prev.map(chat => {
-                if (chat.type === 'direct' && chat.contact) {
-                  const contactIdLower = chat.contact.id?.toLowerCase();
-                  const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
-                  const isMatch = (contactIdLower === keyLower) ||
-                                  (contactShadowIdLower === keyLower);
-                  
-                  if (isMatch) {
-                    return {
-                      ...chat,
-                      contact: { ...chat.contact, isOnline: false, lastSeen: lastSeenTime }
-                    };
-                  }
+            // Process offline immediately to eliminate UI delay and status fluctuation
+            const lastSeenTime = Date.now();
+            heartbeatTimestampsRef.current[keyLower] = 1; // Mark as stale
+            
+            setOnlineUsers(prev => {
+              const updated = new Set(prev);
+              updated.delete(keyLower);
+              // Also remove any shadow IDs associated with this key
+              leftPresences?.forEach(p => {
+                if (p.shadowId) {
+                  const shadowLower = p.shadowId.toLowerCase();
+                  updated.delete(shadowLower);
+                  heartbeatTimestampsRef.current[shadowLower] = 1;
                 }
-                return chat;
-              }));
-
-              const currentChats = chatsRef.current || [];
-              const targetChat = currentChats.find(chat => {
-                if (chat.type === 'direct' && chat.contact) {
-                  const contactIdLower = chat.contact.id?.toLowerCase();
-                  const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
-                  return (contactIdLower === keyLower) || (contactShadowIdLower === keyLower);
-                }
-                return false;
               });
-
-              if (targetChat) {
-                const updatedChatData = {
-                  ...targetChat,
-                  contact: {
-                    ...targetChat.contact,
-                    isOnline: false,
-                    lastSeen: lastSeenTime
-                  }
-                };
-                supabase.from('chats').upsert({
-                  owner_id: myIdLower,
-                  chat_id: targetChat.id.toLowerCase(),
-                  chat_data: updatedChatData
-                }, { onConflict: 'owner_id, chat_id' })
-                .then(({ error }) => {
-                  if (error) console.error('[ShadowTalk] Error saving last seen:', error);
-                });
+              return updated;
+            });
+            
+            setChats(prev => prev.map(chat => {
+              if (chat.type === 'direct' && chat.contact) {
+                const contactIdLower = chat.contact.id?.toLowerCase();
+                const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+                const isMatch = (contactIdLower === keyLower) ||
+                                (contactShadowIdLower === keyLower) ||
+                                (leftPresences?.some(p => p.shadowId?.toLowerCase() === contactShadowIdLower));
+                
+                if (isMatch) {
+                  return {
+                    ...chat,
+                    contact: { ...chat.contact, isOnline: false, lastSeen: lastSeenTime }
+                  };
+                }
               }
-              
-              delete offlineTimeoutRef.current[keyLower];
-            }, 3000);
+              return chat;
+            }));
+
+            const currentChats = chatsRef.current || [];
+            const targetChat = currentChats.find(chat => {
+              if (chat.type === 'direct' && chat.contact) {
+                const contactIdLower = chat.contact.id?.toLowerCase();
+                const contactShadowIdLower = chat.contact.shadowId?.toLowerCase();
+                return (contactIdLower === keyLower) || 
+                       (contactShadowIdLower === keyLower) ||
+                       (leftPresences?.some(p => p.shadowId?.toLowerCase() === contactShadowIdLower));
+              }
+              return false;
+            });
+
+            if (targetChat) {
+              const updatedChatData = {
+                ...targetChat,
+                contact: {
+                  ...targetChat.contact,
+                  isOnline: false,
+                  lastSeen: lastSeenTime
+                }
+              };
+              supabase.from('chats').upsert({
+                owner_id: myIdLower,
+                chat_id: targetChat.id.toLowerCase(),
+                chat_data: updatedChatData
+              }, { onConflict: 'owner_id, chat_id' })
+              .then(({ error }) => {
+                if (error) console.error('[ShadowTalk] Error saving last seen:', error);
+              });
+            }
           }
         });
 
@@ -404,8 +452,7 @@ export const AppProvider = ({ children }) => {
           // Update our own self presence when we come online
           updateSelfPresence(false);
 
-          if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-          pingIntervalRef.current = setInterval(() => {
+          const sendPing = () => {
             if (presenceChannelRef.current && navigator.onLine) {
               presenceChannelRef.current.send({
                 type: 'broadcast',
@@ -413,7 +460,10 @@ export const AppProvider = ({ children }) => {
                 payload: { userId: myIdLower, shadowId: user.shadowId }
               }).catch(() => {});
             }
-          }, 10000);
+          };
+          sendPing(); // Send immediately on connect
+          if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+          pingIntervalRef.current = setInterval(sendPing, 10000);
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           const offlineTime = Date.now();
           setOnlineUsers(new Set());
@@ -478,10 +528,10 @@ export const AppProvider = ({ children }) => {
       
       currentOnline.forEach(id => {
         const lastBeat = heartbeatTimestampsRef.current[id];
-        // Stale if no heartbeat for 30s
-        if (lastBeat && (now - lastBeat) > 30000) {
+        // Stale if no heartbeat for 30s and has not been marked stale (value 1) yet
+        if (lastBeat && lastBeat > 1 && (now - lastBeat) > 30000) {
           changedIds.push(id);
-          delete heartbeatTimestampsRef.current[id];
+          heartbeatTimestampsRef.current[id] = 1; // Mark as stale
         }
       });
 
