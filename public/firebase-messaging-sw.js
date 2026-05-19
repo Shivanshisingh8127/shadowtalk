@@ -46,40 +46,43 @@ async function markMessageAsDelivered(msgId, userId) {
     if (data && data.length > 0) {
       const msg = data[0];
       const isGroup = msg.chat_id?.toLowerCase()?.startsWith('group_');
-      let updatedContent = null;
 
       if (isGroup) {
-        // Group chat message status delivered sync
-        const deliveredTo = msg.content?.deliveredTo || [];
-        if (!deliveredTo.includes(userId)) {
-          deliveredTo.push(userId);
-          updatedContent = {
-            ...msg.content,
-            deliveredTo: deliveredTo
-          };
-        }
-      } else {
-        // Direct chat message: change status to 'delivered' if currently 'sent'
-        if (msg.content?.status === 'sent') {
-          updatedContent = {
-            ...msg.content,
-            status: 'delivered'
-          };
-        }
-      }
-
-      if (updatedContent) {
-        await fetch(url, {
-          method: 'PATCH',
+        // Group chat message status delivered sync using RPC
+        const rpcUrl = `${supabaseUrl}/rest/v1/rpc/append_message_status`;
+        await fetch(rpcUrl, {
+          method: 'POST',
           headers: {
             'apikey': supabaseAnonKey,
             'Authorization': `Bearer ${supabaseAnonKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
+            'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ content: updatedContent })
+          body: JSON.stringify({
+            msg_id: msgId,
+            user_id: userId,
+            status_type: 'delivered'
+          })
         });
-        console.log(`[firebase-messaging-sw.js] Background updated message ${msgId} status successfully.`);
+        console.log(`[firebase-messaging-sw.js] Background updated group message ${msgId} status to delivered.`);
+      } else {
+        // Direct chat message: change status to 'delivered' if currently 'sent'
+        if (msg.content?.status === 'sent') {
+          const updatedContent = {
+            ...msg.content,
+            status: 'delivered'
+          };
+          await fetch(url, {
+            method: 'PATCH',
+            headers: {
+              'apikey': supabaseAnonKey,
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ content: updatedContent })
+          });
+          console.log(`[firebase-messaging-sw.js] Background updated message ${msgId} status to delivered.`);
+        }
       }
     }
   } catch (err) {
@@ -87,21 +90,24 @@ async function markMessageAsDelivered(msgId, userId) {
   }
 }
 
-// Background sweep for all pending direct messages
-async function sweepPendingDirectMessages(userId) {
+// Background sweep for all pending direct and group messages
+async function sweepPendingMessages(userId) {
   try {
-    const url = `${supabaseUrl}/rest/v1/messages?chat_id=eq.${encodeURIComponent(userId)}&content->>status=eq.sent`;
-    const response = await fetch(url, {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // 1. Sweep Direct Messages
+    const directUrl = `${supabaseUrl}/rest/v1/messages?chat_id=eq.${encodeURIComponent(userId)}&content->>status=eq.sent&created_at=gt.${sevenDaysAgo}`;
+    const directResponse = await fetch(directUrl, {
       method: 'GET',
       headers: {
         'apikey': supabaseAnonKey,
         'Authorization': `Bearer ${supabaseAnonKey}`
       }
     });
-    const messages = await response.json();
-    if (messages && messages.length > 0) {
-      console.log(`[firebase-messaging-sw.js] Background sweep found ${messages.length} pending direct messages.`);
-      for (const msg of messages) {
+    const directMessages = await directResponse.json();
+    if (directMessages && directMessages.length > 0) {
+      console.log(`[firebase-messaging-sw.js] Sweep found ${directMessages.length} pending direct messages.`);
+      for (const msg of directMessages) {
         if (msg.sender_id?.toLowerCase() !== userId) {
           const updateUrl = `${supabaseUrl}/rest/v1/messages?id=eq.${encodeURIComponent(msg.id)}`;
           const updatedContent = {
@@ -120,8 +126,62 @@ async function sweepPendingDirectMessages(userId) {
           });
         }
       }
-      console.log(`[firebase-messaging-sw.js] Background sweep updated all direct messages successfully.`);
     }
+
+    // 2. Sweep Group Messages
+    // Fetch group chats the user is part of
+    const chatsUrl = `${supabaseUrl}/rest/v1/chats?owner_id=eq.${encodeURIComponent(userId)}&chat_id=like.group_*`;
+    const chatsResponse = await fetch(chatsUrl, {
+      method: 'GET',
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${supabaseAnonKey}`
+      }
+    });
+    const groupChats = await chatsResponse.json();
+    if (groupChats && groupChats.length > 0) {
+      const groupIds = groupChats.map(c => c.chat_id);
+      const groupIdsStr = groupIds.map(id => `"${id}"`).join(',');
+      
+      // Fetch messages for these groups in the last 7 days
+      const groupMsgsUrl = `${supabaseUrl}/rest/v1/messages?chat_id=in.(${encodeURIComponent(groupIdsStr)})&created_at=gt.${sevenDaysAgo}`;
+      const groupMsgsResponse = await fetch(groupMsgsUrl, {
+        method: 'GET',
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`
+        }
+      });
+      const groupMessages = await groupMsgsResponse.json();
+      if (groupMessages && groupMessages.length > 0) {
+        console.log(`[firebase-messaging-sw.js] Sweep found ${groupMessages.length} group messages in user's groups.`);
+        for (const msg of groupMessages) {
+          if (msg.sender_id?.toLowerCase() !== userId) {
+            const content = msg.content || {};
+            const deliveredTo = content.deliveredTo || [];
+            const seenBy = content.seenBy || [];
+            if (!deliveredTo.includes(userId) && !seenBy.includes(userId)) {
+              // Call RPC to append status
+              const rpcUrl = `${supabaseUrl}/rest/v1/rpc/append_message_status`;
+              await fetch(rpcUrl, {
+                method: 'POST',
+                headers: {
+                  'apikey': supabaseAnonKey,
+                  'Authorization': `Bearer ${supabaseAnonKey}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  msg_id: msg.id,
+                  user_id: userId,
+                  status_type: 'delivered'
+                })
+              });
+            }
+          }
+        }
+      }
+    }
+    console.log(`[firebase-messaging-sw.js] Background sweep finished successfully.`);
   } catch (err) {
     console.error('[firebase-messaging-sw.js] Background sweep error:', err);
   }
@@ -146,7 +206,7 @@ messaging.onBackgroundMessage((payload) => {
         markMessageAsDelivered(msgId, userId);
       }
       // 2. Run a general sweep to catch any other pending messages
-      sweepPendingDirectMessages(userId);
+      sweepPendingMessages(userId);
     }
   });
 

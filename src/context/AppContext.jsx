@@ -963,7 +963,162 @@ export const AppProvider = ({ children }) => {
       }, () => loginMockUser(user.name, user.id, user.phrase, true));
     }
 
+    // 4. Listen to updates on my sent messages (so I get real-time delivery double-ticks)
+    chatSub.on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'messages',
+      filter: `sender_id=eq.${subId1.toLowerCase()}`
+    }, (payload) => {
+      console.log('[ShadowTalk] My sent message updated in real-time:', payload);
+      const updatedMessage = payload.new;
+      if (updatedMessage && updatedMessage.content) {
+        const msgId = updatedMessage.id;
+        const cid = updatedMessage.chat_id.toLowerCase();
+        
+        let decryptedMsgContent;
+        try {
+          const content = typeof updatedMessage.content === 'string' ? JSON.parse(updatedMessage.content) : updatedMessage.content;
+          const decryptedText = decrypt(content.text, updatedMessage.chat_id.toLowerCase());
+          decryptedMsgContent = {
+            ...content,
+            id: updatedMessage.id,
+            senderId: updatedMessage.sender_id,
+            timestamp: new Date(updatedMessage.created_at || Date.now()).getTime(),
+            deleteAt: updatedMessage.delete_at,
+            text: decryptedText,
+            dbChatId: updatedMessage.chat_id,
+            media: content.media || null,
+            replyTo: content.replyTo ? {
+              ...content.replyTo,
+              text: decrypt(content.replyTo.text, updatedMessage.chat_id.toLowerCase())
+            } : null
+          };
+        } catch (e) {
+          console.warn('[ShadowTalk] Decrypt error on sent message update:', e);
+          return;
+        }
 
+        setChats(prev => {
+          let changed = false;
+          const newChats = prev.map(chat => {
+            const isMatch = chat.id.toLowerCase() === cid ||
+                            (chat.contact?.id && chat.contact.id.toLowerCase() === cid) ||
+                            (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === cid);
+            if (isMatch) {
+              const msgs = chat.messages || [];
+              const idx = msgs.findIndex(m => m.id === msgId);
+              if (idx >= 0) {
+                const currentMsg = msgs[idx];
+                const statusChanged = currentMsg.status !== decryptedMsgContent.status || currentMsg.read !== decryptedMsgContent.read;
+                const deliveredChanged = JSON.stringify(currentMsg.deliveredTo) !== JSON.stringify(decryptedMsgContent.deliveredTo) ||
+                                         JSON.stringify(currentMsg.seenBy) !== JSON.stringify(decryptedMsgContent.seenBy);
+                if (statusChanged || deliveredChanged) {
+                  changed = true;
+                  const newMsgs = [...msgs];
+                  newMsgs[idx] = { ...currentMsg, ...decryptedMsgContent };
+                  return { ...chat, messages: newMsgs };
+                }
+              }
+            }
+            return chat;
+          });
+          
+          if (changed) {
+            const updatedChat = newChats.find(c => 
+              c.id.toLowerCase() === cid ||
+              (c.contact?.id && c.contact.id.toLowerCase() === cid)
+            );
+            if (updatedChat) {
+              const chatMetadata = { ...updatedChat, messages: [] };
+              supabase.from('chats').upsert({
+                owner_id: subId1.toLowerCase(),
+                chat_id: cid,
+                chat_data: chatMetadata
+              }, { onConflict: 'owner_id, chat_id' }).then();
+            }
+          }
+          return changed ? newChats : prev;
+        });
+      }
+    });
+
+    if (subId2) {
+      chatSub.on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'messages',
+        filter: `sender_id=eq.${subId2.toLowerCase()}`
+      }, (payload) => {
+        console.log('[ShadowTalk] My shadow-sent message updated in real-time:', payload);
+        const updatedMessage = payload.new;
+        if (updatedMessage && updatedMessage.content) {
+          const msgId = updatedMessage.id;
+          const cid = updatedMessage.chat_id.toLowerCase();
+          
+          let decryptedMsgContent;
+          try {
+            const content = typeof updatedMessage.content === 'string' ? JSON.parse(updatedMessage.content) : updatedMessage.content;
+            const decryptedText = decrypt(content.text, updatedMessage.chat_id.toLowerCase());
+            decryptedMsgContent = {
+              ...content,
+              id: updatedMessage.id,
+              senderId: updatedMessage.sender_id,
+              timestamp: new Date(updatedMessage.created_at || Date.now()).getTime(),
+              deleteAt: updatedMessage.delete_at,
+              text: decryptedText,
+              dbChatId: updatedMessage.chat_id,
+              media: content.media || null,
+              replyTo: content.replyTo ? {
+                ...content.replyTo,
+                text: decrypt(content.replyTo.text, updatedMessage.chat_id.toLowerCase())
+              } : null
+            };
+          } catch (e) {
+            console.warn('[ShadowTalk] Decrypt error on sent message update:', e);
+            return;
+          }
+
+          setChats(prev => {
+            let changed = false;
+            const newChats = prev.map(chat => {
+              const isMatch = chat.id.toLowerCase() === cid ||
+                              (chat.contact?.id && chat.contact.id.toLowerCase() === cid) ||
+                              (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === cid);
+              if (isMatch) {
+                const msgs = chat.messages || [];
+                const idx = msgs.findIndex(m => m.id === msgId);
+                if (idx >= 0) {
+                  const currentMsg = msgs[idx];
+                  const statusChanged = currentMsg.status !== decryptedMsgContent.status || currentMsg.read !== decryptedMsgContent.read;
+                  const deliveredChanged = JSON.stringify(currentMsg.deliveredTo) !== JSON.stringify(decryptedMsgContent.deliveredTo) ||
+                                           JSON.stringify(currentMsg.seenBy) !== JSON.stringify(decryptedMsgContent.seenBy);
+                  if (statusChanged || deliveredChanged) {
+                    changed = true;
+                    const newMsgs = [...msgs];
+                    newMsgs[idx] = { ...currentMsg, ...decryptedMsgContent };
+                    return { ...chat, messages: newMsgs };
+                  }
+                }
+              }
+              return chat;
+            });
+            
+            if (changed) {
+              const updatedChat = newChats.find(c => 
+                c.id.toLowerCase() === cid ||
+                (c.contact?.id && c.contact.id.toLowerCase() === cid)
+              );
+              if (updatedChat) {
+                const chatMetadata = { ...updatedChat, messages: [] };
+                supabase.from('chats').upsert({
+                  owner_id: subId1.toLowerCase(),
+                  chat_id: cid,
+                  chat_data: chatMetadata
+                }, { onConflict: 'owner_id, chat_id' }).then();
+              }
+            }
+            return changed ? newChats : prev;
+          });
+        }
+      });
+    }
 
     // 1. Listen for Typing Indicators
     chatSub.on('broadcast', { event: 'TYPING' }, (payload) => {
