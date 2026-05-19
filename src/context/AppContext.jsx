@@ -4,6 +4,7 @@ import { Download as DownloadIcon } from 'lucide-react';
 import { callService } from '../modules/calling/CallService';
 import { useCallStore } from '../modules/calling/store';
 import { shareContent } from '../utils/shareHelper';
+import io from 'socket.io-client';
 
 const AppContext = createContext();
 
@@ -251,10 +252,49 @@ export const AppProvider = ({ children }) => {
   const heartbeatTimestampsRef = useRef({});
   const pingIntervalRef = useRef(null);
   const monitorIntervalRef = useRef(null);
+  const socketRef = useRef(null);
 
   useEffect(() => {
     if (!user?.id) return;
     const myIdLower = user.id.toLowerCase();
+
+    // Connect Socket.io client to backend server for message_seen events
+    const signalingUrl = import.meta.env.VITE_SIGNALING_URL || 'http://localhost:3001';
+    console.log('[ShadowTalk] Connecting socket.io to', signalingUrl);
+    const socket = io(signalingUrl, {
+      auth: { token: user.id }
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[ShadowTalk] Socket.io connected:', socket.id);
+    });
+
+    socket.on('message_seen', (data) => {
+      const { messageIds, chatId, receiverId } = data;
+      console.log('[ShadowTalk] Received message_seen socket event:', data);
+      
+      // Update local state to mark these messages as seen
+      setChats(prev => prev.map(chat => {
+        const cid = chatId.toLowerCase();
+        const isMatch = chat.id.toLowerCase() === cid ||
+                        (chat.contact?.id && chat.contact.id.toLowerCase() === cid) ||
+                        (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === cid);
+        if (isMatch) {
+          return {
+            ...chat,
+            messages: (chat.messages || []).map(m =>
+              messageIds.includes(m.id) ? { ...m, status: 'seen', read: true } : m
+            )
+          };
+        }
+        return chat;
+      }));
+    });
+
+    socket.on('disconnect', () => {
+      console.log('[ShadowTalk] Socket.io disconnected');
+    });
 
     const initPresence = () => {
       // Connect socket if disconnected
@@ -572,6 +612,10 @@ export const AppProvider = ({ children }) => {
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (monitorIntervalRef.current) clearInterval(monitorIntervalRef.current);
       destroyPresence(false);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
     };
   }, [user?.id]);
 
@@ -619,7 +663,7 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   // Settings
-  const [settings, setSettings] = useState(() => {
+  const [settings, setSettingsState] = useState(() => {
     const defaultSettings = {
       notifications: true,
       readReceipts: true,
@@ -640,6 +684,42 @@ export const AppProvider = ({ children }) => {
       return defaultSettings;
     }
   });
+
+  const setSettings = (newSettingsOrFn) => {
+    setSettingsState(prev => {
+      const next = typeof newSettingsOrFn === 'function' ? newSettingsOrFn(prev) : newSettingsOrFn;
+      
+      // Also persist to localStorage
+      localStorage.setItem('shadowtalk_settings', JSON.stringify(next));
+
+      // Sync to Supabase if user is logged in
+      const uid = userRef.current?.id || user?.id;
+      if (uid) {
+        const uidLower = uid.toLowerCase();
+        console.log('[ShadowTalk] Syncing privacy settings to DB:', next);
+        supabase.from('chats').upsert({
+          owner_id: uidLower,
+          chat_id: 'settings_privacy',
+          chat_data: { 
+            readReceipts: next.readReceipts !== false, 
+            voiceVideo: next.voiceVideo !== false, 
+            typingIndicators: next.typingIndicators !== false, 
+            lastUpdated: Date.now() 
+          }
+        }, { onConflict: 'owner_id, chat_id' }).then(({ error }) => {
+          if (error) console.error('[ShadowTalk] Failed to sync settings to DB:', error);
+        });
+      }
+      
+      return next;
+    });
+  };
+
+  const settingsRef = useRef(settings);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
 
   const [toast, setToast] = useState(null);
@@ -939,6 +1019,17 @@ export const AppProvider = ({ children }) => {
       // Merge logic from legacy metadata sync
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
         const newChatRecord = payload.new;
+        if (newChatRecord && String(newChatRecord.chat_id).toLowerCase().trim() === 'settings_privacy') {
+          console.log('[ShadowTalk] Realtime Privacy settings update received:', newChatRecord.chat_data);
+          setSettingsState(prev => ({
+            ...prev,
+            readReceipts: newChatRecord.chat_data.readReceipts !== false,
+            voiceVideo: newChatRecord.chat_data.voiceVideo !== false,
+            typingIndicators: newChatRecord.chat_data.typingIndicators !== false
+          }));
+          return;
+        }
+
         if (newChatRecord && newChatRecord.chat_data) {
           const decodedChat = decryptChat(newChatRecord.chat_data);
           if (!decodedChat.id) decodedChat.id = newChatRecord.chat_id;
@@ -1938,8 +2029,12 @@ export const AppProvider = ({ children }) => {
                 if (decryptedMsg.deleteAfterRead && !decryptedMsg.deleteAt) {
                   decryptedMsg.deleteAt = Date.now() + (decryptedMsg.disappearDuration || 3600000);
                 }
+
+                const targetStatus = (settingsRef.current?.readReceipts !== false) ? 'seen' : 'delivered';
                 const dbContent = {
                   ...decryptedMsg,
+                  status: targetStatus,
+                  read: (targetStatus === 'seen'),
                   text: encrypt(decryptedMsg.text, gid),
                   replyTo: decryptedMsg.replyTo ? {
                     ...decryptedMsg.replyTo,
@@ -1948,7 +2043,7 @@ export const AppProvider = ({ children }) => {
                 };
                 supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
 
-                // Broadcast seen status back to the sender
+                // Broadcast status back to the sender
                 if (chatSubRef.current) {
                   chatSubRef.current.send({
                     type: 'broadcast',
@@ -1956,8 +2051,18 @@ export const AppProvider = ({ children }) => {
                     payload: {
                       chatId: myId,
                       messageIds: [msg.id],
-                      status: 'seen'
+                      status: targetStatus
                     }
+                  });
+                }
+
+                // Emit "message_seen" socket event to socket.io if read receipts are ON
+                if (settingsRef.current?.readReceipts !== false && socketRef.current && socketRef.current.connected) {
+                  socketRef.current.emit('message_seen', {
+                    messageIds: [msg.id],
+                    chatId: gid,
+                    senderId: msg.sender_id,
+                    receiverId: myId
                   });
                 }
               }
@@ -1992,10 +2097,11 @@ export const AppProvider = ({ children }) => {
             // Group Chat Live Ticks
             if (isViewingThisChat) {
               console.log(`[ShadowTalk] Marking group message ${msg.id} as seen (live)`);
+              const targetStatus = (settingsRef.current?.readReceipts !== false) ? 'seen' : 'delivered';
               supabase.rpc('append_message_status', {
                 msg_id: msg.id,
                 user_id: myId,
-                status_type: 'seen'
+                status_type: targetStatus
               }).then();
             } else {
               console.log(`[ShadowTalk] Marking group message ${msg.id} as delivered (live)`);
@@ -2270,10 +2376,26 @@ export const AppProvider = ({ children }) => {
           );
           
           let finalStatus = m.status;
+          let shouldUpdateDb = false;
+          let dbStatus = m.status;
+
           if (isViewingThisChat) {
             finalStatus = 'seen';
-          } else if (m.status === 'sent') {
-            finalStatus = 'delivered';
+            if (settingsRef.current?.readReceipts !== false) {
+              dbStatus = 'seen';
+              shouldUpdateDb = (m.status !== 'seen');
+            } else {
+              if (m.status === 'sent') {
+                dbStatus = 'delivered';
+                shouldUpdateDb = true;
+              }
+            }
+          } else {
+            if (m.status === 'sent') {
+              finalStatus = 'delivered';
+              dbStatus = 'delivered';
+              shouldUpdateDb = true;
+            }
           }
           
           // Only update if status changes
@@ -2281,11 +2403,22 @@ export const AppProvider = ({ children }) => {
             const finalRead = finalStatus === 'seen';
             const cid = chat.id.toLowerCase();
             if (!statusMap[cid]) statusMap[cid] = { seen: [], delivered: [] };
-            statusMap[cid][finalStatus].push(m.id);
+            
+            if (finalStatus === 'seen' && settingsRef.current?.readReceipts !== false) {
+              statusMap[cid].seen.push(m.id);
+            } else if (finalStatus === 'delivered') {
+              statusMap[cid].delivered.push(m.id);
+            } else if (finalStatus === 'seen' && settingsRef.current?.readReceipts === false && m.status === 'sent') {
+              statusMap[cid].delivered.push(m.id);
+            }
    
-            console.log(`[ShadowTalk] Marking message ${m.id} as ${finalStatus}`);
-            const updatedContent = { ...m, status: finalStatus, read: finalRead };
-            if (finalRead && m.deleteAfterRead && !m.deleteAt) {
+            console.log(`[ShadowTalk] Local marking message ${m.id} as ${finalStatus} (DB Status: ${dbStatus})`);
+          }
+
+          if (shouldUpdateDb && dbStatus !== m.status) {
+            const dbRead = dbStatus === 'seen';
+            const updatedContent = { ...m, status: dbStatus, read: dbRead };
+            if (dbRead && m.deleteAfterRead && !m.deleteAt) {
               updatedContent.deleteAt = Date.now() + (m.disappearDuration || 3600000);
             }
             
@@ -2300,6 +2433,17 @@ export const AppProvider = ({ children }) => {
             promises.push(
               supabase.from('messages').update({ content: encrypted }).eq('id', m.id)
             );
+
+            // Socket.io emit if B marks message as seen
+            if (dbStatus === 'seen' && settingsRef.current?.readReceipts !== false && socketRef.current && socketRef.current.connected) {
+              const senderId = chat.contact?.id || chat.id;
+              socketRef.current.emit('message_seen', {
+                messageIds: [m.id],
+                chatId: chat.id,
+                senderId: senderId,
+                receiverId: userId
+              });
+            }
           }
         });
       }
@@ -2322,13 +2466,16 @@ export const AppProvider = ({ children }) => {
           
           if (isViewingThisChat && !isSeen) {
             console.log(`[ShadowTalk] Marking group message ${m.id} as seen`);
-            promises.push(
-              supabase.rpc('append_message_status', {
-                msg_id: m.id,
-                user_id: myIdLower,
-                status_type: 'seen'
-              })
-            );
+            const targetStatus = (settingsRef.current?.readReceipts !== false) ? 'seen' : 'delivered';
+            if (targetStatus === 'seen' || !isDelivered) {
+              promises.push(
+                supabase.rpc('append_message_status', {
+                  msg_id: m.id,
+                  user_id: myIdLower,
+                  status_type: targetStatus
+                })
+              );
+            }
           } else if (!isViewingThisChat && !isDelivered && !isSeen) {
             console.log(`[ShadowTalk] Marking group message ${m.id} as delivered`);
             promises.push(
@@ -2372,31 +2519,32 @@ export const AppProvider = ({ children }) => {
     // Update local setChats directly so receiver's UI is immediate
     setChats(prev => prev.map(chat => {
       const cid = chat.id.toLowerCase();
-      if (statusMap[cid]) {
-        return {
-          ...chat,
-          messages: (chat.messages || []).map(m => {
-            const isMatch = m.senderId?.toLowerCase() !== myIdLower && m.status === 'sent';
-            if (isMatch) {
-              const isViewingThisChat = activeChatIdRef.current && (
-                String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase() ||
-                (chat.contact?.id && String(activeChatIdRef.current).toLowerCase() === chat.contact.id.toLowerCase()) ||
-                (chat.contact?.shadowId && String(activeChatIdRef.current).toLowerCase() === chat.contact.shadowId.toLowerCase())
-              );
-              const finalStatus = isViewingThisChat ? 'seen' : 'delivered';
-              return { ...m, status: finalStatus, read: isViewingThisChat };
-            }
-            return m;
-          })
-        };
-      }
-      return chat;
+      return {
+        ...chat,
+        messages: (chat.messages || []).map(m => {
+          const isFromMe = m.senderId?.toLowerCase() === myIdLower;
+          if (isFromMe) return m;
+
+          const isViewingThisChat = activeChatIdRef.current && (
+            String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase() ||
+            (chat.contact?.id && String(activeChatIdRef.current).toLowerCase() === chat.contact.id.toLowerCase()) ||
+            (chat.contact?.shadowId && String(activeChatIdRef.current).toLowerCase() === chat.contact.shadowId.toLowerCase())
+          );
+
+          if (isViewingThisChat) {
+            return { ...m, status: 'seen', read: true };
+          } else if (m.status === 'sent') {
+            return { ...m, status: 'delivered' };
+          }
+          return m;
+        })
+      };
     }));
 
     if (promises.length > 0) {
       try {
         await Promise.all(promises);
-        console.log(`[ShadowTalk] Marked ${promises.length} messages as delivered/seen on startup.`);
+        console.log(`[ShadowTalk] Processed ${promises.length} messages status updates on startup.`);
       } catch (err) {
         console.error('[ShadowTalk] Error delivering/seen messages on startup:', err);
       }
@@ -2464,13 +2612,33 @@ export const AppProvider = ({ children }) => {
       console.log('[ShadowTalk] Chats found in DB:', chatData?.length || 0);
 
       if (chatData && chatData.length > 0) {
+        // Intercept settings_privacy
+        const settingsRow = chatData.find(item => String(item.chat_id).toLowerCase().trim() === 'settings_privacy');
+        if (settingsRow && settingsRow.chat_data) {
+          console.log('[ShadowTalk] Privacy settings loaded from DB:', settingsRow.chat_data);
+          setSettingsState(prev => ({
+            ...prev,
+            readReceipts: settingsRow.chat_data.readReceipts !== false,
+            voiceVideo: settingsRow.chat_data.voiceVideo !== false,
+            typingIndicators: settingsRow.chat_data.typingIndicators !== false
+          }));
+        } else {
+          // If no settings row is found, we should upsert a default row to persist it initially!
+          console.log('[ShadowTalk] No privacy settings row found. Creating default in DB...');
+          supabase.from('chats').upsert({
+            owner_id: shortId.toLowerCase(),
+            chat_id: 'settings_privacy',
+            chat_data: { readReceipts: true, voiceVideo: true, typingIndicators: true, lastUpdated: Date.now() }
+          }, { onConflict: 'owner_id, chat_id' }).then();
+        }
+
         const chatsMap = new Map();
 
-        // Group by chat_id to identify duplicates
+        // Group by chat_id to identify duplicates and filter out settings_privacy
         chatData.forEach(item => {
           if (item.chat_data) {
             const cid = (item.chat_id || item.chat_data.id || '').toString().toLowerCase().trim();
-            if (cid) {
+            if (cid && cid !== 'settings_privacy') {
               if (!chatsMap.has(cid)) {
                 chatsMap.set(cid, []);
               }

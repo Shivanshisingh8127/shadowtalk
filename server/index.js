@@ -5,8 +5,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { Registry, collectDefaultMetrics, Counter, Gauge } from 'prom-client';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
+
+const supabaseUrl = process.env.SUPABASE_URL || 'https://uyfcvquwmmvphiezvwvz.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5ZmN2cXV3bW12cGhpZXp2d3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMTE2NTYsImV4cCI6MjA5MjY4NzY1Nn0.TP-ekZJOe4L54kPNU4BespFTpmJZN5mzBBTMBuEJFK4';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const app = express();
 app.use(cors());
@@ -172,6 +177,43 @@ io.on('connection', (socket) => {
     const targetSocketId = userSockets.get(targetId);
     if (targetSocketId) {
       io.to(targetSocketId).emit('call-busy', { from: userId });
+    }
+  });
+
+  // Handle Message Seen with Backend Validation
+  socket.on('message_seen', async (data) => {
+    try {
+      const { messageIds, chatId, senderId, receiverId } = data;
+      if (!messageIds || !chatId || !senderId || !receiverId) return;
+
+      console.log(`[Signaling] message_seen event from receiver ${receiverId} for sender ${senderId} in chat ${chatId}`);
+
+      // Backend Validation: Query settings_privacy row for receiverId in DB
+      const { data: settingsRow, error } = await supabase
+        .from('chats')
+        .select('chat_data')
+        .eq('owner_id', receiverId.toLowerCase())
+        .eq('chat_id', 'settings_privacy')
+        .maybeSingle();
+
+      if (error) {
+        console.error(`[Signaling] Error checking privacy settings for ${receiverId}:`, error);
+      }
+
+      const readReceiptsEnabled = settingsRow?.chat_data?.readReceipts !== false;
+      if (!readReceiptsEnabled) {
+        console.warn(`[Signaling] BLOCKED faked message_seen from ${receiverId} (read receipts disabled)`);
+        return; // Block faked seen updates!
+      }
+
+      // Broadcast to sender's active socket
+      const senderSocketId = userSockets.get(senderId.toLowerCase());
+      if (senderSocketId) {
+        console.log(`[Signaling] Forwarding message_seen event to sender ${senderId}`);
+        io.to(senderSocketId).emit('message_seen', { messageIds, chatId, receiverId });
+      }
+    } catch (err) {
+      console.error('[Signaling] Error in message_seen handler:', err);
     }
   });
 });
