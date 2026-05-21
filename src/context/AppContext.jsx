@@ -4430,14 +4430,15 @@ export const AppProvider = ({ children }) => {
 
   const deleteChat = async (chatId) => {
     if (!user?.id) return;
-    setChats(prev => prev.filter(c => c.id !== chatId));
+    const canonicalChatId = String(chatId).toLowerCase().trim();
+    setChats(prev => prev.filter(c => String(c.id).toLowerCase().trim() !== canonicalChatId));
 
     // Find and delete actual record
     const { data: records } = await supabase
       .from('chats')
       .select('owner_id, chat_data')
       .or(`owner_id.eq."${user.id}",owner_id.eq."${user.shadowId}"`)
-      .eq('chat_id', chatId)
+      .eq('chat_id', canonicalChatId)
       .limit(1);
 
     const data = records?.[0];
@@ -4452,7 +4453,7 @@ export const AppProvider = ({ children }) => {
         chat_data: updatedChatData
       })
         .eq('owner_id', data.owner_id)
-        .eq('chat_id', chatId);
+        .eq('chat_id', canonicalChatId);
     }
   };
 

@@ -327,9 +327,9 @@ export default function ContactProfile() {
       if (confirmAction === 'clear') {
         await clearMessages(id);
         showToast('Chat cleared', 'success');
-      } else if (confirmAction === 'delete') {
+      } else if (confirmAction === 'delete' || confirmAction === 'delete_group') {
         await deleteChat(id);
-        showToast('Conversation deleted', 'success');
+        showToast(confirmAction === 'delete_group' ? 'Group chat deleted' : 'Conversation deleted', 'success');
         navigate('/chats');
       } else if (confirmAction === 'block') {
         await blockContact(id);
@@ -2014,7 +2014,8 @@ export default function ContactProfile() {
               {confirmAction.type === 'restricted' ? confirmAction.title : (
                 <>
                   {confirmAction === 'clear' && 'Clear All Messages?'}
-                  {(confirmAction === 'delete' || confirmAction === 'delete_group') && 'Delete Conversation?'}
+                  {confirmAction === 'delete' && 'Delete Conversation?'}
+                  {confirmAction === 'delete_group' && 'Delete Group Chat?'}
                   {confirmAction === 'block' && 'Block Contact?'}
                   {confirmAction === 'delete_contact' && 'Delete Contact?'}
                   {confirmAction === 'leave_group' && 'Leave Group?'}

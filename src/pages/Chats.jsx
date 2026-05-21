@@ -320,7 +320,7 @@ export default function Chats() {
               {confirmAction.type === 'accept' && 'Accept Request?'}
               {confirmAction.type === 'reject' && 'Reject Request?'}
               {confirmAction.type === 'clear' && 'Clear All Messages?'}
-              {confirmAction.type === 'delete' && 'Delete Conversation?'}
+              {confirmAction.type === 'delete' && (confirmAction.isGroup ? 'Delete Group?' : 'Delete Conversation?')}
               {confirmAction.type === 'block' && 'Block Contact?'}
               {confirmAction.type === 'leave_group' && 'Leave Group?'}
               {confirmAction.type === 'delete_contact' && 'Delete Contact?'}
@@ -329,7 +329,7 @@ export default function Chats() {
               {confirmAction.type === 'accept' && `Add ${confirmAction.request?.senderName} to your contacts?`}
               {confirmAction.type === 'reject' && `Decline the request from ${confirmAction.request?.senderName}?`}
               {confirmAction.type === 'clear' && 'This will empty all messages in this chat. This cannot be undone.'}
-              {confirmAction.type === 'delete' && 'This will remove the chat and all messages. This cannot be undone.'}
+              {confirmAction.type === 'delete' && (confirmAction.isGroup ? 'This will remove this group from your dashboard. This cannot be undone.' : 'This will remove the chat and all messages. This cannot be undone.')}
               {confirmAction.type === 'block' && 'Blocked contacts cannot message you or see your online status.'}
               {confirmAction.type === 'leave_group' && 'Are you sure you want to leave this group?'}
               {confirmAction.type === 'delete_contact' && 'This will remove the contact but keep the chat history.'}
@@ -970,22 +970,35 @@ export default function Chats() {
 
               {selectedQuickChat.type === 'group' ? (
                 <>
-                  <div 
-                    className="menu-item" 
-                    onClick={() => { setConfirmAction({ type: 'clear', id: selectedQuickChat.id }); setSelectedQuickChat(null); }}
-                    style={{ borderRadius: '12px', color: '#ff4444' }}
-                  >
-                    <EraserIcon size={20} />
-                    <span>Clear all message</span>
-                  </div>
-                  <div 
-                    className="menu-item" 
-                    onClick={() => { setConfirmAction({ type: 'leave_group', id: selectedQuickChat.id }); setSelectedQuickChat(null); }}
-                    style={{ borderRadius: '12px', color: '#ff4444' }}
-                  >
-                    <LogOutIcon size={20} />
-                    <span>Leave Group</span>
-                  </div>
+                  {selectedQuickChat.status === 'removed' ? (
+                    <div 
+                      className="menu-item" 
+                      onClick={() => { setConfirmAction({ type: 'delete', id: selectedQuickChat.id, isGroup: true }); setSelectedQuickChat(null); }}
+                      style={{ borderRadius: '12px', color: '#ff4444' }}
+                    >
+                      <Trash2Icon size={20} />
+                      <span>Delete Group</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div 
+                        className="menu-item" 
+                        onClick={() => { setConfirmAction({ type: 'clear', id: selectedQuickChat.id }); setSelectedQuickChat(null); }}
+                        style={{ borderRadius: '12px', color: '#ff4444' }}
+                      >
+                        <EraserIcon size={20} />
+                        <span>Clear all message</span>
+                      </div>
+                      <div 
+                        className="menu-item" 
+                        onClick={() => { setConfirmAction({ type: 'leave_group', id: selectedQuickChat.id }); setSelectedQuickChat(null); }}
+                        style={{ borderRadius: '12px', color: '#ff4444' }}
+                      >
+                        <LogOutIcon size={20} />
+                        <span>Leave Group</span>
+                      </div>
+                    </>
+                  )}
                 </>
               ) : (
                 <>
