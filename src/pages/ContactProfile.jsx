@@ -1046,10 +1046,12 @@ export default function ContactProfile() {
                       <DefaultAvatar name={member.name} size={40} />
                     )}
                   </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                     <span style={{ fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {member.name} {isMe && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>(You)</span>}
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.8, fontFamily: 'monospace', marginLeft: 'auto' }}>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {member.name} {isMe && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>(You)</span>}
+                      </span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.8, fontFamily: 'monospace', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>
                         {member.shadowId || member.name}
                       </span>
                     </span>
@@ -1435,11 +1437,11 @@ export default function ContactProfile() {
                           <CrownIcon size={10} color="#000" fill="#000" />
                         </div>
                       </div>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 600, color: '#fff' }}>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {admin.name} {isMe && '(You)'}
                         </span>
-                        <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {admin.shadowId || admin.name}
                         </span>
                       </div>
@@ -1538,9 +1540,9 @@ export default function ContactProfile() {
                           <DefaultAvatar name={member.name} size={44} />
                         )}
                       </div>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 600, color: '#fff' }}>{member.name}</span>
-                        <span style={{ fontSize: '0.8rem', color: '#888' }}>{member.shadowId || member.name}</span>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.name}</span>
+                        <span style={{ fontSize: '0.8rem', color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.shadowId || member.name}</span>
                       </div>
                     </div>
                   );

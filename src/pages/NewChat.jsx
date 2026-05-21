@@ -182,21 +182,29 @@ export default function NewChat() {
         if (!isDisabled) return false;
 
         const myId = user.id.toLowerCase();
+        const myShadowId = user.shadowId ? user.shadowId.toLowerCase() : null;
         const otherId = receiverDbId.toLowerCase();
+        const otherShadowId = targetUser.shadow_id ? targetUser.shadow_id.toLowerCase() : null;
 
         const myMatch = (c.members || []).some(m => m && (
           String(m.id).toLowerCase() === myId ||
-          String(m.shadowId).toLowerCase() === myId
+          String(m.shadowId).toLowerCase() === myId ||
+          (myShadowId && String(m.id).toLowerCase() === myShadowId) ||
+          (myShadowId && String(m.shadowId).toLowerCase() === myShadowId)
         ));
         const otherMatch = (c.members || []).some(m => m && (
           String(m.id).toLowerCase() === otherId ||
-          String(m.shadowId).toLowerCase() === otherId
+          String(m.shadowId).toLowerCase() === otherId ||
+          (otherShadowId && String(m.id).toLowerCase() === otherShadowId) ||
+          (otherShadowId && String(m.shadowId).toLowerCase() === otherShadowId)
         ));
 
         const isSelfAdmin = String(c.adminId).toLowerCase() === myId ||
-                            (c.members || []).some(m => m && String(m.id).toLowerCase() === myId && m.role === 'admin');
+                            (myShadowId && String(c.adminId).toLowerCase() === myShadowId) ||
+                            (c.members || []).some(m => m && (String(m.id).toLowerCase() === myId || (myShadowId && String(m.id).toLowerCase() === myShadowId)) && m.role === 'admin');
         const isOtherAdmin = String(c.adminId).toLowerCase() === otherId ||
-                             (c.members || []).some(m => m && String(m.id).toLowerCase() === otherId && m.role === 'admin');
+                             (otherShadowId && String(c.adminId).toLowerCase() === otherShadowId) ||
+                             (c.members || []).some(m => m && (String(m.id).toLowerCase() === otherId || (otherShadowId && String(m.id).toLowerCase() === otherShadowId)) && m.role === 'admin');
 
         return myMatch && otherMatch && !isSelfAdmin && !isOtherAdmin;
       }) : null;

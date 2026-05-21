@@ -3454,6 +3454,8 @@ export const AppProvider = ({ children }) => {
     if (currentIsDirect && !targetChat.isSelf) {
       const otherId = targetChat.id.toLowerCase();
       const myId = user.id.toLowerCase();
+      const myShadowId = user.shadowId ? user.shadowId.toLowerCase() : null;
+      const otherShadowId = targetChat?.contact?.shadowId ? targetChat.contact.shadowId.toLowerCase() : null;
 
       // If it's a message to self, bypass the blocking check entirely
       const isSelfMessage = (myId === otherId) || 
@@ -3468,17 +3470,23 @@ export const AppProvider = ({ children }) => {
 
           const myMatch = (c.members || []).some(m => m && (
             String(m.id).toLowerCase() === myId ||
-            String(m.shadowId).toLowerCase() === myId
+            String(m.shadowId).toLowerCase() === myId ||
+            (myShadowId && String(m.id).toLowerCase() === myShadowId) ||
+            (myShadowId && String(m.shadowId).toLowerCase() === myShadowId)
           ));
           const otherMatch = (c.members || []).some(m => m && (
             String(m.id).toLowerCase() === otherId ||
-            String(m.shadowId).toLowerCase() === otherId
+            String(m.shadowId).toLowerCase() === otherId ||
+            (otherShadowId && String(m.id).toLowerCase() === otherShadowId) ||
+            (otherShadowId && String(m.shadowId).toLowerCase() === otherShadowId)
           ));
 
           const isSelfAdmin = String(c.adminId).toLowerCase() === myId ||
-                              (c.members || []).some(m => m && String(m.id).toLowerCase() === myId && m.role === 'admin');
+                              (myShadowId && String(c.adminId).toLowerCase() === myShadowId) ||
+                              (c.members || []).some(m => m && (String(m.id).toLowerCase() === myId || (myShadowId && String(m.id).toLowerCase() === myShadowId)) && m.role === 'admin');
           const isOtherAdmin = String(c.adminId).toLowerCase() === otherId ||
-                               (c.members || []).some(m => m && String(m.id).toLowerCase() === otherId && m.role === 'admin');
+                               (otherShadowId && String(c.adminId).toLowerCase() === otherShadowId) ||
+                               (c.members || []).some(m => m && (String(m.id).toLowerCase() === otherId || (otherShadowId && String(m.id).toLowerCase() === otherShadowId)) && m.role === 'admin');
 
           return myMatch && otherMatch && !isSelfAdmin && !isOtherAdmin;
         });
