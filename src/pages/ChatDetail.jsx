@@ -146,31 +146,7 @@ export default function ChatDetail() {
     }
   }, [id, setActiveChatId]);
 
-  const shadowIdFetchedRef = useRef(false);
-  useEffect(() => {
-    if (chat?.type === 'direct' && id && safeChat.contact && !safeChat.contact.shadowId && !shadowIdFetchedRef.current && updateChatSettings) {
-      shadowIdFetchedRef.current = true;
-      const fetchShadowId = async () => {
-        try {
-          const { data, error } = await supabase.from('users').select('shadow_id, name, avatar_url').eq('id', id).maybeSingle();
-          if (data && data.shadow_id) {
-            console.log('[ChatDetail] Found missing contact info for', id, ':', data);
-            await updateChatSettings(chat.id, { 
-              contact: { 
-                ...safeChat.contact, 
-                shadowId: data.shadow_id,
-                name: safeChat.contact.name && safeChat.contact.name !== 'User' ? safeChat.contact.name : data.name,
-                avatarUrl: safeChat.contact.avatarUrl || data.avatar_url
-              } 
-            });
-          }
-        } catch (err) {
-          console.error('[ChatDetail] Error fetching missing contact info:', err);
-        }
-      };
-      fetchShadowId();
-    }
-  }, [chat?.type, chat?.id, id, safeChat.contact, updateChatSettings]);
+
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [messageToForward, setMessageToForward] = useState(null);
   const [mentionSearch, setMentionSearch] = useState(null); // { query: string, index: number }
@@ -226,6 +202,33 @@ export default function ChatDetail() {
     adminId: '',
     status: 'new'
   };
+
+  const shadowIdFetchedRef = useRef(false);
+  useEffect(() => {
+    if (chat?.type === 'direct' && id && safeChat.contact && !safeChat.contact.shadowId && !shadowIdFetchedRef.current && updateChatSettings) {
+      shadowIdFetchedRef.current = true;
+      const fetchShadowId = async () => {
+        try {
+          const { data, error } = await supabase.from('users').select('shadow_id, name, avatar_url').eq('id', id).maybeSingle();
+          if (data && data.shadow_id) {
+            console.log('[ChatDetail] Found missing contact info for', id, ':', data);
+            await updateChatSettings(chat.id, { 
+              contact: { 
+                ...safeChat.contact, 
+                shadowId: data.shadow_id,
+                name: safeChat.contact.name && safeChat.contact.name !== 'User' ? safeChat.contact.name : data.name,
+                avatarUrl: safeChat.contact.avatarUrl || data.avatar_url
+              } 
+            });
+          }
+        } catch (err) {
+          console.error('[ChatDetail] Error fetching missing contact info:', err);
+        }
+      };
+      fetchShadowId();
+    }
+  }, [chat?.type, chat?.id, id, safeChat.contact, updateChatSettings]);
+
   const isGroup = id?.startsWith('group_') || safeChat.type === 'group';
   const isNoteToSelf = !isGroup && (
     safeChat.isSelf === true || 
