@@ -2869,6 +2869,29 @@ export const AppProvider = ({ children }) => {
                 return true;
               });
 
+            // Apply historical group metadata updates from the decrypted messages
+            if (chat.type === 'group' && chat.messages) {
+              let hasMetadataUpdate = false;
+              chat.messages.forEach(msg => {
+                if (msg.metadata?.isMetadataUpdate && msg.metadata?.updates) {
+                  console.log(`[ShadowTalk] Applying historical metadata update for group ${chat.id}:`, msg.metadata.updates);
+                  Object.assign(chat, msg.metadata.updates);
+                  hasMetadataUpdate = true;
+                }
+              });
+
+              if (hasMetadataUpdate) {
+                // Silently update the user's DB row so the settings are persisted
+                supabase.from('chats').upsert({
+                  owner_id: shortId.toLowerCase(),
+                  chat_id: chatIdLower,
+                  chat_data: chat
+                }, { onConflict: 'owner_id, chat_id' }).then(({ error }) => {
+                  if (error) console.error('[ShadowTalk] Offline metadata sync DB save error:', error);
+                });
+              }
+            }
+
             // 🛡️ SMART MERGE: Preserve local messages not yet seen on server
             // This prevents messages from "disappearing" for the sender during a refresh race condition.
             const currentChat = (chatsRef.current || []).find(c => c && c.id?.toLowerCase() === chatIdLower);
