@@ -489,25 +489,30 @@ export default function ChatDetail() {
     const otherIdLow = otherId.toLowerCase();
     const otherShadowId = safeChat.contact?.shadowId ? safeChat.contact.shadowId.toLowerCase() : null;
     
-    const myMatch = (c.members || []).some(m => m && (
+    const myMatchCondition = (m) => m && (
       String(m.id).toLowerCase() === myId || 
       String(m.shadowId).toLowerCase() === myId ||
       (myShadowId && String(m.id).toLowerCase() === myShadowId) ||
       (myShadowId && String(m.shadowId).toLowerCase() === myShadowId)
-    ));
-    const otherMatch = (c.members || []).some(m => m && (
+    );
+    
+    const otherMatchCondition = (m) => m && (
       String(m.id).toLowerCase() === otherIdLow || 
       String(m.shadowId).toLowerCase() === otherIdLow ||
       (otherShadowId && String(m.id).toLowerCase() === otherShadowId) ||
       (otherShadowId && String(m.shadowId).toLowerCase() === otherShadowId)
-    ));
+    );
+    
+    const myMatch = (c.members || []).some(myMatchCondition);
+    const otherMatch = (c.members || []).some(otherMatchCondition);
     
     const isSelfAdmin = String(c.adminId).toLowerCase() === myId ||
                         (myShadowId && String(c.adminId).toLowerCase() === myShadowId) ||
-                        (c.members || []).some(m => m && (String(m.id).toLowerCase() === myId || (myShadowId && String(m.id).toLowerCase() === myShadowId)) && m.role === 'admin');
+                        (c.members || []).some(m => myMatchCondition(m) && m.role === 'admin');
+                        
     const isOtherAdmin = String(c.adminId).toLowerCase() === otherIdLow ||
                          (otherShadowId && String(c.adminId).toLowerCase() === otherShadowId) ||
-                         (c.members || []).some(m => m && (String(m.id).toLowerCase() === otherIdLow || (otherShadowId && String(m.id).toLowerCase() === otherShadowId)) && m.role === 'admin');
+                         (c.members || []).some(m => otherMatchCondition(m) && m.role === 'admin');
     
     return myMatch && otherMatch && !isSelfAdmin && !isOtherAdmin;
   }) : [];
