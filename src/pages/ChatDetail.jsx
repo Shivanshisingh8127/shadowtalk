@@ -203,10 +203,15 @@ export default function ChatDetail() {
   const isGroup = id?.startsWith('group_') || safeChat.type === 'group';
   const isNoteToSelf = !isGroup && (
     safeChat.isSelf === true || 
-    (safeChat.id?.toLowerCase() === (user?.id || '').toLowerCase() && !safeChat.contact?.id && !safeChat.name) ||
-    (id?.toLowerCase() === (user?.id || '').toLowerCase() && !safeChat.contact?.id) ||
+    (safeChat.id?.toLowerCase() === (user?.id || '').toLowerCase()) ||
+    (safeChat.id?.toLowerCase() === (user?.shortId || '').toLowerCase()) ||
+    (id?.toLowerCase() === (user?.id || '').toLowerCase()) ||
+    (id?.toLowerCase() === (user?.shortId || '').toLowerCase()) ||
     (user?.shadowId && id?.toLowerCase() === user.shadowId.toLowerCase()) ||
-    (user?.shadowId && safeChat.id?.toLowerCase() === user.shadowId.toLowerCase())
+    (user?.shadowId && safeChat.id?.toLowerCase() === user.shadowId.toLowerCase()) ||
+    (safeChat.contact?.id?.toLowerCase() === (user?.id || '').toLowerCase()) ||
+    (safeChat.contact?.id?.toLowerCase() === (user?.shortId || '').toLowerCase()) ||
+    (user?.shadowId && safeChat.contact?.id?.toLowerCase() === user.shadowId.toLowerCase())
   );
   const name = isNoteToSelf ? 'Note to Self' : (isGroup ? (safeChat.name || 'Unnamed Group') : (safeChat.contact?.nickname || safeChat.contact?.name || id));
   const isAdmin = isGroup && (safeChat.adminId === user?.id || (safeChat.members || []).some(m => m && m.id === user?.id && m.role === 'admin'));
