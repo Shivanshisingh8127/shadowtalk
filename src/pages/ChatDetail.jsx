@@ -542,6 +542,14 @@ export default function ChatDetail() {
     const isOtherAdmin = String(c.adminId).toLowerCase() === otherIdLow ||
                          (otherShadowId && String(c.adminId).toLowerCase() === otherShadowId) ||
                          (c.members || []).some(m => otherMatchCondition(m) && m.role === 'admin');
+
+    console.log(`[Diagnostic] Group: ${c.name || c.id}, isDisabled: ${isDisabled}, myId: ${myId}, myShadow: ${myShadowId}, otherId: ${otherIdLow}, otherShadow: ${otherShadowId}, myMatch: ${myMatch}, otherMatch: ${otherMatch}, isSelfAdmin: ${isSelfAdmin}, isOtherAdmin: ${isOtherAdmin}`);
+    if (!myMatch) {
+      console.log(`[Diagnostic] myMatch failed. Group members:`, c.members);
+    }
+    if (!otherMatch) {
+      console.log(`[Diagnostic] otherMatch failed. Group members:`, c.members);
+    }
     
     return myMatch && otherMatch && !isSelfAdmin && !isOtherAdmin;
   }) : [];
