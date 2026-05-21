@@ -1106,9 +1106,9 @@ export default function ContactProfile() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <button className="btn-primary" style={{ flex: 1 }} onClick={() => {
-                    const isAdminOfGroup = chat.adminId.toLowerCase() === user?.id.toLowerCase();
+                    const isAdminOfGroup = isAdmin;
                     const isTargetAdmin = selectedMemberInfo.role === 'admin' || selectedMemberInfo.id.toLowerCase() === chat.adminId.toLowerCase();
-                    const isDMsAllowed = chat.allow_member_dm !== false;
+                    const isDMsAllowed = chat.allow_member_dm !== false && chat.allowMemberDMs !== false;
 
                     if (isAdminOfGroup || isTargetAdmin || isDMsAllowed) {
                       const existingChat = chats.find(c => c.type === 'direct' && c.contact?.id === selectedMemberInfo.id);

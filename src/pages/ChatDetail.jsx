@@ -204,7 +204,9 @@ export default function ChatDetail() {
   const isNoteToSelf = !isGroup && (
     safeChat.isSelf === true || 
     (safeChat.id?.toLowerCase() === (user?.id || '').toLowerCase() && !safeChat.contact?.id && !safeChat.name) ||
-    (id?.toLowerCase() === (user?.id || '').toLowerCase() && !safeChat.contact?.id)
+    (id?.toLowerCase() === (user?.id || '').toLowerCase() && !safeChat.contact?.id) ||
+    (user?.shadowId && id?.toLowerCase() === user.shadowId.toLowerCase()) ||
+    (user?.shadowId && safeChat.id?.toLowerCase() === user.shadowId.toLowerCase())
   );
   const name = isNoteToSelf ? 'Note to Self' : (isGroup ? (safeChat.name || 'Unnamed Group') : (safeChat.contact?.nickname || safeChat.contact?.name || id));
   const isAdmin = isGroup && (safeChat.adminId === user?.id || (safeChat.members || []).some(m => m && m.id === user?.id && m.role === 'admin'));
@@ -489,8 +491,10 @@ export default function ChatDetail() {
       String(m.shadowId).toLowerCase() === otherIdLow
     ));
     
-    const isSelfAdmin = String(c.adminId).toLowerCase() === myId;
-    const isOtherAdmin = String(c.adminId).toLowerCase() === otherIdLow;
+    const isSelfAdmin = String(c.adminId).toLowerCase() === myId ||
+                        (c.members || []).some(m => m && String(m.id).toLowerCase() === myId && m.role === 'admin');
+    const isOtherAdmin = String(c.adminId).toLowerCase() === otherIdLow ||
+                         (c.members || []).some(m => m && String(m.id).toLowerCase() === otherIdLow && m.role === 'admin');
     
     return myMatch && otherMatch && !isSelfAdmin && !isOtherAdmin;
   }) : [];
@@ -3473,7 +3477,7 @@ export default function ChatDetail() {
                       if (isMe) return;
 
                       const isMemberAdmin = member.role === 'admin' || member.id === chat.adminId;
-                      const allowMemberDMs = chat.allowMemberDMs || false;
+                      const allowMemberDMs = chat.allow_member_dm !== false && chat.allowMemberDMs !== false;
 
                       if (isAdmin) {
                         setShowMembers(false);

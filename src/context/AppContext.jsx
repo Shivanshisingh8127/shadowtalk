@@ -3432,31 +3432,39 @@ export const AppProvider = ({ children }) => {
       const otherId = targetChat.id.toLowerCase();
       const myId = user.id.toLowerCase();
 
-      const currentChats = chatsRef.current || [];
-      const blockingGroup = currentChats.find(c => {
-        if (!c || c.type !== 'group') return false;
-        const isDisabled = c.allow_member_dm === false || c.allowMemberDMs === false;
-        if (!isDisabled) return false;
+      // If it's a message to self, bypass the blocking check entirely
+      const isSelfMessage = (myId === otherId) || 
+                            (user.shadowId && String(user.shadowId).toLowerCase() === otherId);
 
-        const myMatch = (c.members || []).some(m => m && (
-          String(m.id).toLowerCase() === myId ||
-          String(m.shadowId).toLowerCase() === myId
-        ));
-        const otherMatch = (c.members || []).some(m => m && (
-          String(m.id).toLowerCase() === otherId ||
-          String(m.shadowId).toLowerCase() === otherId
-        ));
+      if (!isSelfMessage) {
+        const currentChats = chatsRef.current || [];
+        const blockingGroup = currentChats.find(c => {
+          if (!c || c.type !== 'group') return false;
+          const isDisabled = c.allow_member_dm === false || c.allowMemberDMs === false;
+          if (!isDisabled) return false;
 
-        const isSelfAdmin = String(c.adminId).toLowerCase() === myId;
-        const isOtherAdmin = String(c.adminId).toLowerCase() === otherId;
+          const myMatch = (c.members || []).some(m => m && (
+            String(m.id).toLowerCase() === myId ||
+            String(m.shadowId).toLowerCase() === myId
+          ));
+          const otherMatch = (c.members || []).some(m => m && (
+            String(m.id).toLowerCase() === otherId ||
+            String(m.shadowId).toLowerCase() === otherId
+          ));
 
-        return myMatch && otherMatch && !isSelfAdmin && !isOtherAdmin;
-      });
+          const isSelfAdmin = String(c.adminId).toLowerCase() === myId ||
+                              (c.members || []).some(m => m && String(m.id).toLowerCase() === myId && m.role === 'admin');
+          const isOtherAdmin = String(c.adminId).toLowerCase() === otherId ||
+                               (c.members || []).some(m => m && String(m.id).toLowerCase() === otherId && m.role === 'admin');
 
-      if (blockingGroup) {
-        console.warn('[ShadowTalk] Message rejected: Member DMs disabled by admin in group', blockingGroup.id);
-        showToast('Direct messages are currently disabled by group admin.', 'error');
-        return;
+          return myMatch && otherMatch && !isSelfAdmin && !isOtherAdmin;
+        });
+
+        if (blockingGroup) {
+          console.warn('[ShadowTalk] Message rejected: Member DMs disabled by admin in group', blockingGroup.id);
+          showToast('Direct messages are currently disabled by group admin.', 'error');
+          return;
+        }
       }
     }
 

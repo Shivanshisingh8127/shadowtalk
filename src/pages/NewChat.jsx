@@ -173,14 +173,33 @@ export default function NewChat() {
       }
       
       // 3.7 Check for group restriction (allow_member_dm = false)
-      const blockingGroup = (chats || []).find(c => 
-        c && c.type === 'group' && 
-        (c.allow_member_dm === false || c.allowMemberDMs === false) && 
-        (c.members || []).some(m => m && (m.id.toLowerCase() === user.id.toLowerCase() || m.shadowId?.toLowerCase() === user.id.toLowerCase())) && 
-        (c.members || []).some(m => m && (m.id.toLowerCase() === receiverDbId || m.shadowId?.toLowerCase() === receiverDbId)) &&
-        c.adminId.toLowerCase() !== user.id.toLowerCase() &&
-        c.adminId.toLowerCase() !== receiverDbId
-      );
+      const isSelfMessage = user.id.toLowerCase() === receiverDbId.toLowerCase() ||
+                            (user.shadowId && user.shadowId.toLowerCase() === receiverDbId.toLowerCase());
+
+      const blockingGroup = !isSelfMessage ? (chats || []).find(c => {
+        if (!c || c.type !== 'group') return false;
+        const isDisabled = c.allow_member_dm === false || c.allowMemberDMs === false;
+        if (!isDisabled) return false;
+
+        const myId = user.id.toLowerCase();
+        const otherId = receiverDbId.toLowerCase();
+
+        const myMatch = (c.members || []).some(m => m && (
+          String(m.id).toLowerCase() === myId ||
+          String(m.shadowId).toLowerCase() === myId
+        ));
+        const otherMatch = (c.members || []).some(m => m && (
+          String(m.id).toLowerCase() === otherId ||
+          String(m.shadowId).toLowerCase() === otherId
+        ));
+
+        const isSelfAdmin = String(c.adminId).toLowerCase() === myId ||
+                            (c.members || []).some(m => m && String(m.id).toLowerCase() === myId && m.role === 'admin');
+        const isOtherAdmin = String(c.adminId).toLowerCase() === otherId ||
+                             (c.members || []).some(m => m && String(m.id).toLowerCase() === otherId && m.role === 'admin');
+
+        return myMatch && otherMatch && !isSelfAdmin && !isOtherAdmin;
+      }) : null;
 
       if (blockingGroup) {
         console.log('[NewChat] DM restricted by group admin');
