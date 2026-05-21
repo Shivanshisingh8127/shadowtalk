@@ -1776,18 +1776,10 @@ export const AppProvider = ({ children }) => {
           const currentChat = (chatsRef.current || []).find(c => c && c.id?.toLowerCase() === targetChatId);
 
           if (currentChat) {
-            const mergedChat = { ...currentChat, ...updates, lastActivity: Date.now() };
-            console.log('[ShadowTalk] Saving synced metadata to DB:', targetChatId, updates);
-
-            lastSyncRef.current = Date.now(); // Prevent immediate loginMockUser overwrite
-            supabase.from('chats').upsert({
-              owner_id: userRef.current?.id?.toLowerCase(),
-              chat_id: targetChatId,
-              chat_data: mergedChat
-            }, { onConflict: 'owner_id, chat_id' }).then(({ error }) => {
-              if (error) console.error('[ShadowTalk] Metadata auto-save error:', error);
-              else console.log('[ShadowTalk] Metadata auto-save success for:', targetChatId, mergedChat.disappearingConfig);
-            });
+            console.log('[ShadowTalk] Received metadata sync, applying locally (DB sync handled by sender):', targetChatId, updates);
+            // We NO LONGER blind-upsert the entire chat object here!
+            // The sender already updated the chats table for everyone.
+            // Blindly upserting our local state here causes race conditions that overwrite recent member additions!
           }
         }
 
@@ -1812,6 +1804,21 @@ export const AppProvider = ({ children }) => {
 
               return [newGroup, ...prev];
             });
+          } else if (content?.groupMetadata && content?.groupMetadata?.members) {
+            // If someone ELSE was added, sync our local members array to match the admin's!
+            setChats(prev => prev.map(c => {
+              if (c.id.toLowerCase() === msg.chat_id.toLowerCase()) {
+                const updatedChat = { ...c, members: content.groupMetadata.members };
+                // Also auto-heal our DB record so it has the full members list
+                supabase.from('chats').upsert({
+                  owner_id: userRef.current?.id.toLowerCase(),
+                  chat_id: msg.chat_id.toLowerCase(),
+                  chat_data: updatedChat
+                }, { onConflict: 'owner_id, chat_id' });
+                return updatedChat;
+              }
+              return c;
+            }));
           }
         }
 
