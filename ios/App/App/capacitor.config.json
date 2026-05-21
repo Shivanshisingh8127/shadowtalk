@@ -1,0 +1,10 @@
+{
+	"appId": "com.shadowtalk.app",
+	"appName": "ShadowTalk",
+	"webDir": "dist",
+	"packageClassList": [
+		"AppPlugin",
+		"HapticsPlugin",
+		"PushNotificationsPlugin"
+	]
+}

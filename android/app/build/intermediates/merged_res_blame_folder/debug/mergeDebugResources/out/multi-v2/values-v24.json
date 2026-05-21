@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.shadowtalk.app-mergeDebugResources-35:/values-v24/values-v24.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\hshek\\.gradle\\caches\\9.4.1\\transforms\\96cd2cade6305ad138813f1b2a41dfe3\\transformed\\appcompat-1.7.1\\res\\values-v24\\values-v24.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,212",
+                        "endColumns": "156,134",
+                        "endOffsets": "207,342"
+                    }
+                }
+            ]
+        }
+    ]
+}
