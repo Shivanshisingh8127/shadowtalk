@@ -2583,12 +2583,13 @@ export const AppProvider = ({ children }) => {
     
     // Send status broadcast to senders
     Object.entries(statusMap).forEach(([cid, data]) => {
+      const targetChat = chatsList.find(c => c.id.toLowerCase() === cid);
       if (data.seen.length > 0 && chatSubRef.current) {
         chatSubRef.current.send({
           type: 'broadcast',
           event: 'MESSAGE_STATUS_UPDATE',
           payload: {
-            chatId: chat?.type === 'group' ? cid : myIdLower,
+            chatId: targetChat?.type === 'group' ? cid : myIdLower,
             readerId: myIdLower,
             messageIds: data.seen,
             status: 'seen'
@@ -2600,7 +2601,7 @@ export const AppProvider = ({ children }) => {
           type: 'broadcast',
           event: 'MESSAGE_STATUS_UPDATE',
           payload: {
-            chatId: chat?.type === 'group' ? cid : myIdLower,
+            chatId: targetChat?.type === 'group' ? cid : myIdLower,
             readerId: myIdLower,
             messageIds: data.delivered,
             status: 'delivered'
