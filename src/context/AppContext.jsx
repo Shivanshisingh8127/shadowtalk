@@ -1389,11 +1389,34 @@ export const AppProvider = ({ children }) => {
     // 1.2 Group Membership Sync Broadcast
     chatSub.on('broadcast', { event: 'GROUP_SYNC' }, (payload) => {
       const { groupId, members, lastActivity, type } = payload.payload;
-      console.log(`[ShadowTalk] Group sync received for ${groupId}:`, type);
-
       setChats(prev => prev.map(chat => {
         if (String(chat.id).toLowerCase() === String(groupId).toLowerCase()) {
-          return { ...chat, members: members, lastActivity: lastActivity || Date.now() };
+          const amIInGroup = members.some(m => m && (String(m.id).toLowerCase() === String(user.id).toLowerCase() || (user.shadowId && m.shadowId && String(m.shadowId).toLowerCase() === String(user.shadowId).toLowerCase())));
+          
+          const updatedChat = { ...chat, members: members, lastActivity: lastActivity || Date.now() };
+
+          if (!amIInGroup && chat.status !== 'removed') {
+            updatedChat.status = 'removed';
+            updatedChat.exitType = 'removed';
+            updatedChat.removedAt = Date.now();
+            
+            let intervals = [...(updatedChat.membershipIntervals || [])];
+            if (intervals.length > 0 && !intervals[intervals.length - 1].removedAt) {
+              intervals[intervals.length - 1].removedAt = updatedChat.removedAt;
+            }
+            updatedChat.membershipIntervals = intervals;
+
+            // Self-update DB row asynchronously
+            supabase.from('chats').upsert({
+              owner_id: user.id.toLowerCase(),
+              chat_id: groupId,
+              chat_data: updatedChat
+            }, { onConflict: 'owner_id, chat_id' }).then(() => {
+              console.log('[ShadowTalk] Self-updated DB row to removed status via GROUP_SYNC');
+            });
+          }
+
+          return updatedChat;
         }
         return chat;
       }));
@@ -5123,52 +5146,32 @@ export const AppProvider = ({ children }) => {
         chat_id: canonicalGroupId,
         chat_data: removedUserChat
       }, { onConflict: 'owner_id, chat_id' });
-    } else {
-      // No existing record
-      await supabase.from('chats').upsert({
-        owner_id: memberIdLower,
-        chat_id: canonicalGroupId,
-        chat_data: {
-          ...targetChat,
-          membershipIntervals: [{ joinedAt: targetChat.lastActivity || (removedAt - 3600000), removedAt }],
-          status: 'removed',
-          exitType: 'removed',
-          removedAt,
-          members: updatedMembers,
-          messages: [],
-          lastActivity: removedAt
-        }
-      }, { onConflict: 'owner_id, chat_id' });
     }
 
-    // 2. Update remaining members' rows in DB (non-blocking)
-    const updatePromises = updatedMembers.map(async (m) => {
-      try {
-        const { data: existing } = await supabase
-          .from('chats')
-          .select('chat_data')
-          .eq('owner_id', m.id.toLowerCase()) // Normalize
-          .eq('chat_id', canonicalGroupId)
-          .maybeSingle();
-
-        const baseChat = existing?.chat_data || updatedGroupMetadata;
-        await supabase.from('chats').upsert({
-          owner_id: m.id.toLowerCase(), // Normalize
-          chat_id: canonicalGroupId,
-          chat_data: { ...baseChat, members: updatedMembers, messages: [], lastActivity: Date.now() }
-        }, { onConflict: 'owner_id, chat_id' });
-      } catch (e) {
-        console.error('[ShadowTalk] Background sync failed for member:', m.id, e);
-      }
-    });
+    // Try to find the removed member's real row by looking at all rows for this group
+    const { data: allGroupChats } = await supabase
+      .from('chats')
+      .select('owner_id, chat_data')
+      .eq('chat_id', canonicalGroupId);
+      
+    if (allGroupChats) {
+      // Update ALL rows in the group to have the new members array
+      // This ensures even offline removed members get locked out when they fetch their row
+      const updateAllPromises = allGroupChats.map(async (c) => {
+        const newChatData = { ...c.chat_data, members: updatedMembers };
+        await supabase.from('chats').update({ chat_data: newChatData })
+          .eq('owner_id', c.owner_id)
+          .eq('chat_id', canonicalGroupId);
+      });
+      await Promise.all(updateAllPromises);
+    }
 
     // 3. Save system message and trigger background work
     Promise.all([
       supabase.from('messages').insert({
         chat_id: canonicalGroupId,
         content: { ...systemMsg, text: encrypt(systemMsg.text, canonicalGroupId) }
-      }),
-      ...updatePromises
+      })
     ]).catch(err => console.error('[ShadowTalk] Post-removal sync error:', err));
 
     // 6. Broadcast for instant UI update
