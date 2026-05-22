@@ -98,6 +98,7 @@ export const AppProvider = ({ children }) => {
         id: myIdLower,
         type: 'direct',
         status: 'direct',
+        isSelf: true,
         contact: {
           id: myIdLower,
           name: userRef.current.name,
@@ -105,26 +106,31 @@ export const AppProvider = ({ children }) => {
           avatarUrl: userRef.current.avatarUrl || null
         },
         messages: [],
-        lastActivity: lastSeenTime
+        // lastActivity is intentionally NOT set here — it must only update when user sends a message
       };
     }
     
     if (!selfChat.contact) selfChat.contact = {};
+    // Only update lastSeen (used for "last seen" indicator), NOT lastActivity (sort key)
     selfChat.contact.lastSeen = lastSeenTime;
-    selfChat.lastActivity = lastSeenTime;
-    
-    // Update local state immediately so local UI displays correctly
+    // DO NOT update selfChat.lastActivity — this would cause Note to Self to bubble to top
+
+    // Update local state: only patch contact.lastSeen, never lastActivity
     setChats(prev => prev.map(c => {
-      if (c.owner_id === myIdLower && c.chat_id === myIdLower) {
+      const isSelf = c.isSelf === true || c.id?.toLowerCase() === myIdLower;
+      if (isSelf) {
         return {
           ...c,
-          chat_data: selfChat
+          contact: {
+            ...(c.contact || {}),
+            lastSeen: lastSeenTime
+          }
         };
       }
       return c;
     }));
     
-    // Update database
+    // Update database (write full selfChat object for the contact's self-row so others can read lastSeen)
     if (isClosing) {
       const url = `${supabaseUrl}/rest/v1/chats`;
       const payload = {
@@ -162,6 +168,7 @@ export const AppProvider = ({ children }) => {
       }
     }
   };
+
 
   // Helper to fetch the latest global lastSeen values of all direct contacts
   const syncContactsLastSeen = async (currentChatsList) => {
@@ -1837,6 +1844,8 @@ export const AppProvider = ({ children }) => {
             const t_id = String(targetChatId).toLowerCase().trim();
             
             if (cid === g_id || cid === t_id) {
+              // Never update lastActivity for Note to Self during profile syncs
+              if (c.isSelf) return { ...c, ...updates };
               console.log('[ShadowTalk] Metadata sync applying to:', c.id, updates);
               return { ...c, ...updates, lastActivity: Date.now() };
             }
@@ -2370,8 +2379,8 @@ export const AppProvider = ({ children }) => {
           const updated = {
             ...chat,
             notificationType: 'All Messages',
-            muteUntil: null,
-            lastActivity: Date.now()
+            muteUntil: null
+            // lastActivity intentionally NOT updated — mute expiry should not reorder chats
           };
 
           // Persistence (Async)
