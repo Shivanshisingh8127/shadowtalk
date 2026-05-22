@@ -2115,8 +2115,8 @@ export const AppProvider = ({ children }) => {
                   text: encrypt(decryptedMsg.replyTo.text, msg.chat_id.toLowerCase())
                 } : null
               };
-              supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).catch(() => {});
-              supabase.rpc('append_message_status', { msg_id: msg.id, user_id: myId, status_type: 'delivered' }).catch(() => {});
+              supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then().catch(() => {});
+              supabase.rpc('append_message_status', { msg_id: msg.id, user_id: myId, status_type: 'delivered' }).then().catch(() => {});
 
               // Broadcast delivered status back to the sender
               if (chatSubRef.current) {
@@ -2181,6 +2181,13 @@ export const AppProvider = ({ children }) => {
               }
 
               updatedMessages.sort((a, b) => a.timestamp - b.timestamp);
+
+              // Calculate if the user is actively viewing this specific chat
+              const isViewingThisChat = activeChatIdRef.current && document.visibilityState === 'visible' && (
+                String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase() ||
+                (chat.contact?.id && String(activeChatIdRef.current).toLowerCase() === chat.contact.id.toLowerCase()) ||
+                (chat.contact?.shadowId && String(activeChatIdRef.current).toLowerCase() === chat.contact.shadowId.toLowerCase())
+              );
 
               // Notify the receiver if they are not actively viewing this chat
               if (!isViewingThisChat && msg.sender_id !== userRef.current?.id && idx < 0) {
