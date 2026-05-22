@@ -249,18 +249,16 @@ export default function ChatDetail() {
   const rejoinRequested = safeChat.rejoinRequested || false;
   let chatMessages = safeChat.messages || [];
   
-  // If removed, only show messages up to the point of removal (respect intervals if they exist)
+  // Always filter messages by membership intervals if they exist so users don't see gap messages
   const intervals = safeChat.membershipIntervals || [];
-  if (isRemoved) {
-    if (intervals.length > 0) {
-      chatMessages = chatMessages.filter(msg => {
-        return intervals.some(inv => 
-          msg.timestamp >= (inv.joinedAt - 5000) && (!inv.removedAt || msg.timestamp <= (inv.removedAt + 5000))
-        );
-      });
-    } else if (safeChat.removedAt) {
-      chatMessages = chatMessages.filter(msg => msg.timestamp <= (safeChat.removedAt + 5000));
-    }
+  if (intervals.length > 0) {
+    chatMessages = chatMessages.filter(msg => {
+      return intervals.some(inv => 
+        msg.timestamp >= (inv.joinedAt - 5000) && (!inv.removedAt || msg.timestamp <= (inv.removedAt + 5000))
+      );
+    });
+  } else if (isRemoved && safeChat.removedAt) {
+    chatMessages = chatMessages.filter(msg => msg.timestamp <= (safeChat.removedAt + 5000));
   }
 
   // Group consecutive pin notifications

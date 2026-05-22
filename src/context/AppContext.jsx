@@ -1293,6 +1293,12 @@ export const AppProvider = ({ children }) => {
 
       // Filter direct chats: only show if I am the intended recipient
       if (!isGroup && targetUserId?.toLowerCase() !== myId) return;
+      
+      if (isGroup) {
+        const groupChat = (chatsRef.current || []).find(c => String(c.id).toLowerCase() === String(chatId).toLowerCase());
+        const isParticipant = groupChat && (groupChat.members || []).some(m => m && (String(m.id).toLowerCase() === myId || (userRef.current?.shadowId && m.shadowId && String(m.shadowId).toLowerCase() === String(userRef.current?.shadowId).toLowerCase())));
+        if (!groupChat || groupChat.status === 'removed' || !isParticipant) return;
+      }
 
       // For direct chats, the local chatId is the sender's ID (userId)
       // For group chats, the local chatId is the group ID (chatId)
