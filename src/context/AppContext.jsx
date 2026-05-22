@@ -1662,7 +1662,7 @@ export const AppProvider = ({ children }) => {
         const currentGroupChat = (chatsRef.current || []).find(c => String(c.id).toLowerCase() === chatId.toLowerCase());
         isForMe = currentGroupChat &&
           currentGroupChat.status !== 'removed' &&
-          (currentGroupChat.members || []).some(m => m && (String(m.id).toLowerCase() === myId || String(m.shadowId).toLowerCase() === myShadowId));
+          (currentGroupChat.adminId?.toLowerCase() === myId || (currentGroupChat.members || []).some(m => m && (String(m.id).toLowerCase() === myId || (myShadowId && m.shadowId && String(m.shadowId).toLowerCase() === myShadowId))));
       } else {
         // Direct: I must be either the sender or the recipient
         isForMe = senderId.toLowerCase() === myId ||
@@ -1714,7 +1714,7 @@ export const AppProvider = ({ children }) => {
       if (chatId.startsWith('group_')) {
         const isParticipant = currentChat && (
           currentChat.status !== 'removed' &&
-          (currentChat.members || []).some(m => m && (String(m.id).toLowerCase() === userRef.current?.id?.toLowerCase() || String(m.shadowId).toLowerCase() === String(userRef.current?.shadowId).toLowerCase()))
+          (currentChat.members || []).some(m => m && (String(m.id).toLowerCase() === userRef.current?.id?.toLowerCase() || (userRef.current?.shadowId && m.shadowId && String(m.shadowId).toLowerCase() === String(userRef.current?.shadowId).toLowerCase())))
         );
 
         const isRemoved = currentChat?.status === 'removed';
@@ -1837,7 +1837,7 @@ export const AppProvider = ({ children }) => {
             // Group: Only notify if we are still a participant
             isForMe = currentChat &&
               currentChat.status !== 'removed' &&
-              (currentChat.members || []).some(m => m && (String(m.id).toLowerCase() === userRef.current?.id.toLowerCase() || String(m.shadowId).toLowerCase() === String(userRef.current?.shadowId).toLowerCase()));
+              (currentChat.adminId?.toLowerCase() === userRef.current?.id.toLowerCase() || (currentChat.members || []).some(m => m && (String(m.id).toLowerCase() === userRef.current?.id.toLowerCase() || (userRef.current?.shadowId && m.shadowId && String(m.shadowId).toLowerCase() === String(userRef.current?.shadowId).toLowerCase()))));
           }
 
           if (!isForMe) return;
@@ -3388,7 +3388,7 @@ export const AppProvider = ({ children }) => {
 
     const isGroup = canonicalId.startsWith('group_') || targetChat?.type === 'group';
     const isParticipant = !isGroup || (
-      (targetChat?.members || []).some(m => m && (String(m.id).toLowerCase() === user.id.toLowerCase() || String(m.shadowId).toLowerCase() === String(user.shadowId).toLowerCase())) &&
+      (targetChat?.members || []).some(m => m && (String(m.id).toLowerCase() === String(user.id).toLowerCase() || (user.shadowId && m.shadowId && String(m.shadowId).toLowerCase() === String(user.shadowId).toLowerCase()))) &&
       targetChat?.status !== 'removed'
     );
 
@@ -5032,11 +5032,12 @@ export const AppProvider = ({ children }) => {
     );
     if (!memberToRemove) return;
 
-    const updatedMembers = (targetChat.members || []).filter(m =>
-      m &&
-      m.id && String(m.id).toLowerCase() !== String(memberId).toLowerCase() &&
-      m.shadowId && String(m.shadowId).toLowerCase() !== String(memberId).toLowerCase()
-    );
+    const updatedMembers = (targetChat.members || []).filter(m => {
+      if (!m || !m.id) return false;
+      const idMatch = String(m.id).toLowerCase() === String(memberId).toLowerCase();
+      const shadowMatch = m.shadowId && String(m.shadowId).toLowerCase() === String(memberId).toLowerCase();
+      return !(idMatch || shadowMatch);
+    });
     const memberIdLower = memberId.toLowerCase();
 
     const systemMsg = {
