@@ -2121,7 +2121,8 @@ export const AppProvider = ({ children }) => {
                     text: encrypt(decryptedMsg.replyTo.text, keyToUse)
                   } : null
                 };
-                supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
+                supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).catch(() => {});
+                supabase.rpc('append_message_status', { msg_id: msg.id, user_id: myId, status_type: targetStatus }).catch(() => {});
 
                 // Broadcast status back to the sender
                 if (chatSubRef.current) {
@@ -2159,7 +2160,8 @@ export const AppProvider = ({ children }) => {
                     text: encrypt(decryptedMsg.replyTo.text, keyToUse)
                   } : null
                 };
-                supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
+                supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).catch(() => {});
+                supabase.rpc('append_message_status', { msg_id: msg.id, user_id: myId, status_type: targetStatus }).catch(() => {});
 
                 // Broadcast delivered status back to the sender
                 if (chatSubRef.current) {
@@ -2508,6 +2510,14 @@ export const AppProvider = ({ children }) => {
                 })
               );
             } else {
+              promises.push(
+                supabase.rpc('append_message_status', {
+                  msg_id: m.id,
+                  user_id: userId,
+                  status_type: dbStatus
+                }).catch(() => {})
+              );
+              
               const dbRead = dbStatus === 'seen';
               const updatedContent = { ...m, status: dbStatus, read: dbRead };
               if (dbRead && m.deleteAfterRead && !m.deleteAt) {
@@ -2524,7 +2534,7 @@ export const AppProvider = ({ children }) => {
                 } : null
               };
               promises.push(
-                supabase.from('messages').update({ content: encrypted }).eq('id', m.id)
+                supabase.from('messages').update({ content: encrypted }).eq('id', m.id).catch(() => {})
               );
             }
 
@@ -2629,9 +2639,12 @@ export const AppProvider = ({ children }) => {
           );
 
           if (isViewingThisChat) {
-            return { ...m, status: 'seen', read: true };
-          } else if (m.status === 'sent') {
-            return { ...m, status: 'delivered' };
+            const targetStatus = settingsRef.current?.readReceipts !== false ? 'seen' : 'delivered';
+            return { ...m, status: targetStatus, read: targetStatus === 'seen' };
+          } else {
+            if (m.status === 'sent') {
+              return { ...m, status: 'delivered', read: false };
+            }
           }
           return m;
         })
@@ -2956,6 +2969,10 @@ export const AppProvider = ({ children }) => {
                   content = { text: '[Message Error]' };
                 }
 
+                // Inject DB status arrays for tick logic bypassing RLS
+                if (m.seen_by && m.seen_by.length > 0) content.seenBy = m.seen_by;
+                if (m.delivered_to && m.delivered_to.length > 0) content.deliveredTo = m.delivered_to;
+
                 const decryptKey = m.chat_id;
                 const decryptedText = decrypt(content.text, decryptKey);
 
@@ -3205,7 +3222,7 @@ export const AppProvider = ({ children }) => {
         isDeletedByOther: false, // 🔓 Reset on reconnection
         unreadCount: 0,
         lastActivity: Date.now(),
-        messages: [...(senderChatData.messages || []), acceptanceMsg],
+        messages: [acceptanceMsg],
         contact: {
           ...(existingReceiverData.contact || {}),
           id: senderId,
@@ -3226,7 +3243,7 @@ export const AppProvider = ({ children }) => {
         status: 'direct',
         reconnection: false,
         isDeletedByOther: false, // 🔓 Reset on reconnection
-        messages: [...(senderChatData.messages || []), acceptanceMsg],
+        messages: [acceptanceMsg],
         lastActivity: Date.now()
       };
 
@@ -4082,8 +4099,8 @@ export const AppProvider = ({ children }) => {
           ...chat,
           unreadCount: 0,
           messages: (chat.messages || []).map(m =>
-            m.senderId?.toLowerCase() !== user.id.toLowerCase()
-              ? { ...m, read: true, status: 'seen' }
+            m.senderId?.toLowerCase() !== user.id.toLowerCase() && !m.read && m.status !== 'seen'
+              ? { ...m, read: (settingsRef.current?.readReceipts !== false), status: (settingsRef.current?.readReceipts !== false ? 'seen' : 'delivered') }
               : m
           )
         };
@@ -4130,19 +4147,23 @@ export const AppProvider = ({ children }) => {
           chatId: targetChat.type === 'group' ? actualChatId : userRef.current?.id?.toLowerCase(),
           readerId: userRef.current?.id?.toLowerCase(),
           messageIds: unreadMsgIds,
-          status: 'seen'
+          status: settingsRef.current?.readReceipts !== false ? 'seen' : 'delivered'
         }
       });
       console.log('[ShadowTalk] Broadcasted seen status for:', unreadMsgIds);
     }
 
     const updatePromises = unreadMessages.map(async m => {
+      const targetStatus = settingsRef.current?.readReceipts !== false ? 'seen' : 'delivered';
+      
+      const rpcPromise = supabase.rpc('append_message_status', {
+        msg_id: m.id,
+        user_id: user.id.toLowerCase(),
+        status_type: targetStatus
+      });
+
       if (targetChat.type === 'group') {
-        return supabase.rpc('append_message_status', {
-          msg_id: m.id,
-          user_id: user.id.toLowerCase(),
-          status_type: 'seen'
-        });
+        return rpcPromise;
       }
 
       const updatedContent = { ...m, read: true, status: 'seen' };
@@ -4162,7 +4183,10 @@ export const AppProvider = ({ children }) => {
         } : null
       };
 
-      return supabase.from('messages').update({ content: dbContent }).eq('id', m.id);
+      return Promise.all([
+        rpcPromise.catch(() => {}),
+        supabase.from('messages').update({ content: dbContent }).eq('id', m.id).catch(() => {})
+      ]);
     });
 
     await Promise.all(updatePromises).catch(err => console.error('Mark as read atomic error:', err));
@@ -4836,7 +4860,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteContact = async (chatId) => {
     if (!user?.id) return;
-    await updateChatSettings(chatId, { status: 'deleted', reconnection: false });
+    await updateChatSettings(chatId, { status: 'deleted', reconnection: false, clearedAt: Date.now() });
 
     // Clear any existing requests between these two users
     await supabase

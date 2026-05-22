@@ -45,11 +45,11 @@ export default function BlockedContacts() {
           padding: '16px', 
           borderRadius: '16px', 
           marginBottom: '24px',
-          border: '1px solid rgba(255, 68, 68, 0.3)',
+          border: '1px solid var(--accent-primary)',
           display: 'flex',
           gap: '12px'
         }}>
-          <ShieldIcon size={20} color="#ff4444" style={{ flexShrink: 0 }} />
+          <ShieldIcon size={20} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
             Blocked contacts cannot message you, see your online status, or view your profile updates.
           </p>
@@ -77,7 +77,7 @@ export default function BlockedContacts() {
                   transition: 'transform 0.2s'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0, overflow: 'hidden' }}>
                   <div style={{ width: '48px', height: '48px', flexShrink: 0, borderRadius: '50%', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     {chat.contact?.avatarUrl ? (
                       <img src={chat.contact.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -85,16 +85,16 @@ export default function BlockedContacts() {
                       <UserIcon size={24} color="var(--text-muted)" />
                     )}
                   </div>
-                  <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                     <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {chat.contact?.nickname || chat.contact?.name || 'Unknown'}
                     </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                       {chat.contact?.shadowId || chat.id}
                     </div>
                   </div>
                 </div>
-                <button className="icon-btn" onClick={(e) => handleContextMenu(e, chat)} style={{ margin: 0 }}>
+                <button className="icon-btn" onClick={(e) => handleContextMenu(e, chat)} style={{ margin: 0, flexShrink: 0 }}>
                   <MoreVerticalIcon size={20} />
                 </button>
               </div>

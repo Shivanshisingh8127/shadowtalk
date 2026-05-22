@@ -2470,13 +2470,13 @@ export default function ChatDetail() {
                           )
                         ) : (
                           // Direct Chat Ticks
-                          (msg.status === 'seen' || msg.read) ? (
+                          (msg.status === 'seen' || msg.read || (msg.seenBy && msg.seenBy.some(sId => sId.toLowerCase() === (safeChat.contact?.id || id).toLowerCase()))) ? (
                             settings.readReceipts ? (
                               <CheckCheckIcon size={14} color="#34b7f1" style={{ opacity: 1 }} />
                             ) : (
                               <CheckCheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
                             )
-                          ) : msg.status === 'delivered' ? (
+                          ) : (msg.status === 'delivered' || (msg.deliveredTo && msg.deliveredTo.some(dId => dId.toLowerCase() === (safeChat.contact?.id || id).toLowerCase()))) ? (
                             <CheckCheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
                           ) : (
                             <CheckIcon size={14} color="var(--text-muted)" style={{ opacity: 0.6 }} />
