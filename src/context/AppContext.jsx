@@ -3175,6 +3175,15 @@ export const AppProvider = ({ children }) => {
         contact: { id: receiverId, name: user.name, isOnline: true }
       };
 
+      // 2b. Fetch the receiver's existing chat row to preserve clearedAt/deletedForMe/theme
+      const { data: receiverChatRow } = await supabase
+        .from('chats')
+        .select('chat_data')
+        .match({ owner_id: receiverId, chat_id: senderId })
+        .maybeSingle();
+
+      const existingReceiverData = receiverChatRow?.chat_data || {};
+
       // 3. Create the acceptance system message
       const acceptanceMsg = {
         id: `sys_acc_${Date.now()}`,
@@ -3185,8 +3194,9 @@ export const AppProvider = ({ children }) => {
 
       // 4. Create/Update the chat for the RECEIVER (Me)
       const receiverChat = {
-        ...senderChatData,
+        ...existingReceiverData,
         id: senderId,
+        type: 'direct',
         status: 'direct',
         reconnection: false,
         isDeletedByOther: false, // 🔓 Reset on reconnection
@@ -3194,6 +3204,7 @@ export const AppProvider = ({ children }) => {
         lastActivity: Date.now(),
         messages: [...(senderChatData.messages || []), acceptanceMsg],
         contact: {
+          ...(existingReceiverData.contact || {}),
           id: senderId,
           shadowId: request.senderShadowId,
           name: request.senderName,
