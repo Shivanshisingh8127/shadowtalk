@@ -41,11 +41,11 @@ export default function BlockedContacts() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
         <div style={{ 
-          backgroundColor: 'rgba(255, 68, 68, 0.1)', 
+          backgroundColor: 'var(--bg-secondary)', 
           padding: '16px', 
           borderRadius: '16px', 
           marginBottom: '24px',
-          border: '1px solid rgba(255, 68, 68, 0.2)',
+          border: '1px solid rgba(255, 68, 68, 0.3)',
           display: 'flex',
           gap: '12px'
         }}>
