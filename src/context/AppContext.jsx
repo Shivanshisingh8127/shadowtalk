@@ -4737,12 +4737,12 @@ export const AppProvider = ({ children }) => {
       const leftAt = serverTime;
 
       // 2. Remove user from members list
-      const updatedMembers = (targetChat.members || []).filter(m =>
-        m &&
-        m.id && String(m.id).toLowerCase() !== String(user.id).toLowerCase() &&
-        m.shadowId && String(m.shadowId).toLowerCase() !== String(user.shadowId).toLowerCase() &&
-        m.id !== user.id && m.shadowId !== user.shadowId
-      );
+      const updatedMembers = (targetChat.members || []).filter(m => {
+        if (!m || !m.id) return false;
+        const idMatch = String(m.id).toLowerCase() === String(user.id).toLowerCase();
+        const shadowMatch = user.shadowId && m.shadowId && String(m.shadowId).toLowerCase() === String(user.shadowId).toLowerCase();
+        return !(idMatch || shadowMatch);
+      });
 
       let intervals = [...(targetChat.membershipIntervals || [])];
       if (intervals.length > 0 && !intervals[intervals.length - 1].removedAt) {
