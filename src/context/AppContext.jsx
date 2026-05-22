@@ -4538,11 +4538,13 @@ export const AppProvider = ({ children }) => {
       }
 
       // 1b. BROADCAST the deletion to ensure real-time sync (even if DB events are slow/incomplete)
-      supabase.channel(`chat-realtime-${canonicalChatId}`).send({
-        type: 'broadcast',
-        event: 'MESSAGE_DELETED',
-        payload: { messageIds }
-      });
+      if (chatSubRef.current) {
+        chatSubRef.current.send({
+          type: 'broadcast',
+          event: 'MESSAGE_DELETED',
+          payload: { messageIds }
+        });
+      }
 
       // 2. Update local state immediately
       setChats(prev => prev.map(chat => {
