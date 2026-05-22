@@ -243,7 +243,7 @@ export default function ChatDetail() {
     (user?.shadowId && safeChat.contact?.id?.toLowerCase() === user.shadowId.toLowerCase())
   );
   const name = isNoteToSelf ? 'Note to Self' : (isGroup ? (safeChat.name || 'Unnamed Group') : (safeChat.contact?.nickname || safeChat.contact?.name || id));
-  const isAdmin = isGroup && (safeChat.adminId === user?.id || (safeChat.members || []).some(m => m && m.id === user?.id && m.role === 'admin'));
+  const isAdmin = isGroup && (safeChat.adminId === user?.id || (safeChat.members || []).some(m => m && (String(m.id).toLowerCase() === String(user?.id).toLowerCase() || (user?.shadowId && m.shadowId && String(m.shadowId).toLowerCase() === String(user?.shadowId).toLowerCase())) && m.role === 'admin'));
   const isParticipant = isGroup ? (safeChat.members && Array.isArray(safeChat.members) && safeChat.members.some(m => m && (String(m.id).toLowerCase() === String(user?.id).toLowerCase() || (user?.shadowId && m.shadowId && String(m.shadowId).toLowerCase() === String(user?.shadowId).toLowerCase())))) : true;
   const isRemoved = isGroup && !isParticipant && !isAdmin && (safeChat.status === 'removed' || !!chat);
   const rejoinRequested = safeChat.rejoinRequested || false;
