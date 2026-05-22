@@ -2893,25 +2893,31 @@ export const AppProvider = ({ children }) => {
                 m.sender_id?.toLowerCase() === myIdLower
               );
             } else if (chat.type === 'direct') {
-              // Direct chat: messages I sent (chat_id = contactId) OR received (chat_id = myId, sender = contactId)
-              chatMsgs = combinedMsgs.filter(m => {
-                const content = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
-                const partnerIdInContent = content?.partnerId?.toLowerCase();
+              // If the contact was deleted, show NO messages — the user wiped this relationship.
+              // Messages sent by the contact AFTER deletion should be invisible until they reconnect.
+              if (chat.status === 'deleted') {
+                chatMsgs = [];
+              } else {
+                // Direct chat: messages I sent (chat_id = contactId) OR received (chat_id = myId, sender = contactId)
+                chatMsgs = combinedMsgs.filter(m => {
+                  const content = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
+                  const partnerIdInContent = content?.partnerId?.toLowerCase();
 
-                // Special logic for system messages: they must match the partnerId if present
-                const isSystemMessage = m.sender_id === 'system';
-                const systemMatch = isSystemMessage && (!partnerIdInContent || partnerIdInContent === chatIdLower);
+                  // Special logic for system messages: they must match the partnerId if present
+                  const isSystemMessage = m.sender_id === 'system';
+                  const systemMatch = isSystemMessage && (!partnerIdInContent || partnerIdInContent === chatIdLower);
 
-                const isMatch = (m.chat_id?.toLowerCase() === chatIdLower && (m.sender_id?.toLowerCase() === myIdLower || systemMatch)) ||
-                  (m.chat_id?.toLowerCase() === myIdLower && (m.sender_id?.toLowerCase() === chatIdLower || systemMatch));
-                if (!isMatch) return false;
+                  const isMatch = (m.chat_id?.toLowerCase() === chatIdLower && (m.sender_id?.toLowerCase() === myIdLower || systemMatch)) ||
+                    (m.chat_id?.toLowerCase() === myIdLower && (m.sender_id?.toLowerCase() === chatIdLower || systemMatch));
+                  if (!isMatch) return false;
 
-                if (chat.clearedAt) {
-                  const msgTime = new Date(m.created_at).getTime();
-                  return msgTime >= chat.clearedAt;
-                }
-                return true;
-              });
+                  if (chat.clearedAt) {
+                    const msgTime = new Date(m.created_at).getTime();
+                    return msgTime >= chat.clearedAt;
+                  }
+                  return true;
+                });
+              }
             } else {
               // Group chats: Filter by membership intervals (WhatsApp model)
               const intervals = chat.membershipIntervals || [];
@@ -2995,18 +3001,21 @@ export const AppProvider = ({ children }) => {
 
             // 🛡️ SMART MERGE: Preserve local messages not yet seen on server
             // This prevents messages from "disappearing" for the sender during a refresh race condition.
-            const currentChat = (chatsRef.current || []).find(c => c && c.id?.toLowerCase() === chatIdLower);
-            if (currentChat && currentChat.messages) {
-              const serverMsgIds = new Set(chat.messages.map(m => m.id));
-              const localOnlyMsgs = currentChat.messages.filter(m => {
-                if (serverMsgIds.has(m.id)) return false;
-                if (chat.clearedAt && m.timestamp < chat.clearedAt) return false;
-                return true;
-              });
+            // Skip for deleted chats — no old messages should leak back in.
+            if (chat.status !== 'deleted') {
+              const currentChat = (chatsRef.current || []).find(c => c && c.id?.toLowerCase() === chatIdLower);
+              if (currentChat && currentChat.messages) {
+                const serverMsgIds = new Set(chat.messages.map(m => m.id));
+                const localOnlyMsgs = currentChat.messages.filter(m => {
+                  if (serverMsgIds.has(m.id)) return false;
+                  if (chat.clearedAt && m.timestamp < chat.clearedAt) return false;
+                  return true;
+                });
 
-              if (localOnlyMsgs.length > 0) {
-                console.log(`[ShadowTalk] Preserving ${localOnlyMsgs.length} local messages for chat ${chat.id}`);
-                chat.messages = [...chat.messages, ...localOnlyMsgs].sort((a, b) => a.timestamp - b.timestamp);
+                if (localOnlyMsgs.length > 0) {
+                  console.log(`[ShadowTalk] Preserving ${localOnlyMsgs.length} local messages for chat ${chat.id}`);
+                  chat.messages = [...chat.messages, ...localOnlyMsgs].sort((a, b) => a.timestamp - b.timestamp);
+                }
               }
             }
           });
