@@ -1052,8 +1052,8 @@ export default function ContactProfile() {
                       <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {member.name} {isMe && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>(You)</span>}
                       </span>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.8, fontFamily: 'monospace', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>
-                        {member.shadowId || member.name}
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.8, fontFamily: 'monospace', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1, maxWidth: '120px' }}>
+                        {(member.shadowId || member.name)?.substring(0, 16)}...
                       </span>
                     </span>
                     {isMemberAdmin ? (
@@ -1445,8 +1445,8 @@ export default function ContactProfile() {
                           <span style={{ fontSize: '1.05rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {admin.name} {isMe && '(You)'} {isTargetHeadAdmin && <span style={{fontSize: '0.75rem', color: '#FF6B6B', marginLeft: '4px'}}>(Head)</span>}
                           </span>
-                          <span style={{ fontSize: '0.8rem', color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {admin.shadowId || admin.name}
+                          <span style={{ fontSize: '0.8rem', color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px', display: 'block' }}>
+                            {(admin.shadowId || admin.name)?.substring(0, 20)}...
                           </span>
                         </div>
                       </div>

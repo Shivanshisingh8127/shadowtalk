@@ -831,8 +831,8 @@ export default function Chats() {
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>
                   {selectedQuickChat.type === 'group' ? selectedQuickChat.name : (selectedQuickChat.contact?.nickname || selectedQuickChat.contact?.name || 'Unknown')}
                 </h3>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                  {selectedQuickChat.type === 'group' ? '' : (selectedQuickChat.contact?.shadowId || selectedQuickChat.id)}
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: '200px' }}>
+                  {selectedQuickChat.type === 'group' ? '' : ((selectedQuickChat.contact?.shadowId || selectedQuickChat.id)?.substring(0, 20) + '...')}
                 </span>
               </div>
               <button 
