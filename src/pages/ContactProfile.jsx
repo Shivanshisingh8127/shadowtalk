@@ -224,7 +224,11 @@ export default function ContactProfile() {
         setMuteUntil(null);
         setMuteTimer(null);
         setNotifications('All Messages');
-        updateChatSettings(id, { notificationType: 'All Messages', muteUntil: null });
+        if (isGroup) {
+          updateGroupSettings(chat?.id || id, { notificationType: 'All Messages', muteUntil: null });
+        } else {
+          updateChatSettings(chat?.id || id, { notificationType: 'All Messages', muteUntil: null });
+        }
         clearInterval(interval);
       } else {
         const hours = Math.floor(diff / 3600000);
@@ -256,7 +260,7 @@ export default function ContactProfile() {
     
     try {
       // Rule 11: Priority to allow_member_dm
-      await updateGroupSettings(id, { allow_member_dm: newVal, allowMemberDMs: newVal });
+      await updateGroupSettings(chat?.id || id, { allow_member_dm: newVal, allowMemberDMs: newVal });
       showToast(`Group messaging for members ${newVal ? 'enabled' : 'disabled'}`, 'info');
     } catch (err) {
       setLocalAllowDMs(!newVal); // Revert on error
@@ -325,25 +329,25 @@ export default function ContactProfile() {
     
     try {
       if (confirmAction === 'clear') {
-        await clearMessages(id);
+        await clearMessages(chat?.id || id);
         showToast('Chat cleared', 'success');
       } else if (confirmAction === 'delete' || confirmAction === 'delete_group') {
-        await deleteChat(id);
+        await deleteChat(chat?.id || id);
         showToast(confirmAction === 'delete_group' ? 'Group chat deleted' : 'Conversation deleted', 'success');
         navigate('/chats');
       } else if (confirmAction === 'block') {
-        await blockContact(id);
+        await blockContact(chat?.id || id);
         showToast('Contact blocked', 'success');
         navigate('/chats');
       } else if (confirmAction === 'delete_contact') {
-        await deleteContact(id);
+        await deleteContact(chat?.id || id);
         showToast('Contact deleted', 'success');
         navigate('/chats');
       } else if (confirmAction === 'leave_group') {
-        await leaveGroup(id);
+        await leaveGroup(chat?.id || id);
         navigate('/chats');
       } else if (confirmAction === 'delete_group_admin') {
-        await deleteGroup(id);
+        await deleteGroup(chat?.id || id);
         navigate('/chats');
       }
     } catch (err) {
@@ -377,9 +381,9 @@ export default function ContactProfile() {
         .getPublicUrl(filePath);
 
       if (isGroup) {
-        await updateGroupSettings(id, { avatarUrl: publicUrl });
+        await updateGroupSettings(chat?.id || id, { avatarUrl: publicUrl });
       } else {
-        await updateChatSettings(id, { avatarUrl: publicUrl });
+        await updateChatSettings(chat?.id || id, { avatarUrl: publicUrl });
       }
       showToast('Profile picture updated!', 'success');
     } catch (err) {
@@ -401,9 +405,9 @@ export default function ContactProfile() {
     if (nickname.trim()) {
       try {
         if (isGroup) {
-          await updateGroupSettings(id, { name: nickname });
+          await updateGroupSettings(chat?.id || id, { name: nickname });
         } else {
-          await updateChatSettings(id, { contact: { ...chat.contact, nickname: nickname } });
+          await updateChatSettings(chat?.id || id, { contact: { ...chat.contact, nickname: nickname } });
         }
         showToast('Name updated successfully!', 'success');
         setShowEdit(false);
@@ -438,21 +442,21 @@ export default function ContactProfile() {
     if (!confirmAction) return;
 
     if (confirmAction === 'clear') {
-      await clearMessages(id);
+      await clearMessages(chat?.id || id);
     } else if (confirmAction === 'delete' || confirmAction === 'delete_group') {
-      await deleteChat(id);
+      await deleteChat(chat?.id || id);
       navigate('/chats');
       return;
     } else if (confirmAction === 'block') {
-      await blockContact(id);
+      await blockContact(chat?.id || id);
       navigate('/chats');
       return;
     } else if (confirmAction === 'delete_contact') {
-      await deleteChat(id);
+      await deleteChat(chat?.id || id);
       navigate('/chats');
       return;
     } else if (confirmAction === 'leave_group') {
-      await leaveGroup(id);
+      await leaveGroup(chat?.id || id);
       navigate('/chats');
       return;
     }
@@ -569,9 +573,9 @@ export default function ContactProfile() {
               const config = { type: tempDisappearType, timer: tempDisappearTimer };
               setDisappearingState(tempDisappearType === 'Off' ? 'Off' : `${tempDisappearType} (${tempDisappearTimer})`);
               if (isGroup) {
-                await updateGroupSettings(id, { disappearingConfig: config });
+                await updateGroupSettings(chat?.id || id, { disappearingConfig: config });
               } else {
-                await updateChatSettings(id, { disappearingConfig: config });
+                await updateChatSettings(chat?.id || id, { disappearingConfig: config });
               }
               setActiveView('main');
             }}
@@ -674,9 +678,9 @@ export default function ContactProfile() {
                 }
 
                 if (isGroup) {
-                  await updateGroupSettings(id, { notificationType: finalType, muteUntil: finalMuteUntil });
+                  await updateGroupSettings(chat?.id || id, { notificationType: finalType, muteUntil: finalMuteUntil });
                 } else {
-                  await updateChatSettings(id, { notificationType: finalType, muteUntil: finalMuteUntil });
+                  await updateChatSettings(chat?.id || id, { notificationType: finalType, muteUntil: finalMuteUntil });
                 }
                 
                 setNotifications(finalType);
@@ -848,7 +852,7 @@ export default function ContactProfile() {
                             icon: Trash2Icon
                           });
                           if (confirmed) {
-                            await bulkDeleteMessages(id, [msg.id], false);
+                            await bulkDeleteMessages(chat?.id || id, [msg.id], false);
                             showToast('File deleted', 'success');
                           }
                         }}
@@ -894,7 +898,7 @@ export default function ContactProfile() {
                     icon: Trash2Icon
                   });
                   if (confirmed) {
-                    await bulkDeleteMessages(id, [previewMedia.id], false);
+                    await bulkDeleteMessages(chat?.id || id, [previewMedia.id], false);
                     setPreviewMedia(null);
                     showToast('Media deleted', 'success');
                   }
@@ -1219,7 +1223,7 @@ export default function ContactProfile() {
                     }}
                     onClick={async () => {
                       if (confirmAction.type === 'remove_member') {
-                        await removeMemberFromGroup(id, confirmAction.member.id);
+                        await removeMemberFromGroup(chat?.id || id, confirmAction.member.id);
                       } else {
                         await handleConfirmAction();
                       }
@@ -1299,7 +1303,7 @@ export default function ContactProfile() {
                   disabled={!addMemberId.trim()}
                   onClick={async () => {
                     if (addMemberId.trim()) {
-                      await addMemberToGroup(id, addMemberId.trim());
+                      await addMemberToGroup(chat?.id || id, addMemberId.trim());
                       setActiveView('group_members');
                       setAddMemberId('');
                     }
@@ -1470,7 +1474,7 @@ export default function ContactProfile() {
                           <button 
                             className="btn-secondary" 
                             style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
-                            onClick={() => demoteAdminToMember(chat.id, admin.id)}
+                            onClick={() => demoteAdminToMember(chat?.id || id, admin.id)}
                           >
                             Demote to Member
                           </button>
@@ -1557,7 +1561,7 @@ export default function ContactProfile() {
                           icon: CrownIcon
                         });
                         if (confirmed) {
-                          await promoteMemberToAdmin(id, member.id);
+                          await promoteMemberToAdmin(chat?.id || id, member.id);
                           setActiveView('manage_admins');
                         }
                       }}
@@ -1724,7 +1728,7 @@ export default function ContactProfile() {
           )}
           
           <div className="settings-item hoverable" onClick={async () => {
-            const newState = await togglePin(id);
+            const newState = await togglePin(chat?.id || id);
             setPinned(newState);
           }} style={{ gap: '16px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
@@ -1982,7 +1986,6 @@ export default function ContactProfile() {
                   className="menu-item hoverable" 
                   onClick={async (e) => { 
                     e.stopPropagation();
-                    console.log('[ShadowTalk] Mute option selected:', option.value);
                     setMuteTimer(option.value); 
                     
                     let duration = 0;
@@ -2004,11 +2007,9 @@ export default function ContactProfile() {
                     // SAVE PERSISTENTLY
                     try {
                       if (isGroup) {
-                        console.log('[ShadowTalk] Updating group mute settings for:', id);
-                        await updateGroupSettings(id, { notificationType: finalType, muteUntil: finalMuteUntil });
+                        await updateGroupSettings(chat?.id || id, { notificationType: finalType, muteUntil: finalMuteUntil });
                       } else {
-                        console.log('[ShadowTalk] Updating chat mute settings for:', id);
-                        await updateChatSettings(id, { notificationType: finalType, muteUntil: finalMuteUntil });
+                        await updateChatSettings(chat?.id || id, { notificationType: finalType, muteUntil: finalMuteUntil });
                       }
                       setMuteFeedback(`Notifications muted for ${option.label}`);
                       showToast(`Muted for ${option.label}`, 'success');
