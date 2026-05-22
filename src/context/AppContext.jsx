@@ -5294,6 +5294,119 @@ export const AppProvider = ({ children }) => {
     showToast(`${memberToPromote.name} promoted to Admin`);
   };
 
+  const demoteAdminToMember = async (groupId, memberId) => {
+    if (!user?.id) return;
+    const canonicalGroupId = groupId.toLowerCase();
+    const targetChat = chats.find(c => c.id.toLowerCase() === canonicalGroupId);
+
+    // ONLY the head admin (group creator) can demote
+    const isHeadAdmin = targetChat && targetChat.adminId === user.id;
+    if (!targetChat || !isHeadAdmin) {
+      showToast('Only the head admin can demote other admins', 'error');
+      return;
+    }
+
+    const memberToDemote = (targetChat.members || []).find(m =>
+      m && (String(m.id).toLowerCase() === String(memberId).toLowerCase() || String(m.shadowId).toLowerCase() === String(memberId).toLowerCase())
+    );
+    if (!memberToDemote || memberToDemote.role !== 'admin') return;
+
+    if (String(memberToDemote.id).toLowerCase() === targetChat.adminId.toLowerCase()) {
+      showToast('Cannot demote the head admin', 'error');
+      return;
+    }
+
+    const updatedMembers = (targetChat.members || []).map(m => {
+      if (m && (String(m.id).toLowerCase() === String(memberId).toLowerCase() || String(m.shadowId).toLowerCase() === String(memberId).toLowerCase())) {
+        return { ...m, role: 'member' };
+      }
+      return m;
+    });
+
+    const systemMsg = {
+      id: `m_${Date.now()}`,
+      text: `${memberToDemote.name} was demoted to Member by ${user.name}`,
+      senderId: 'system',
+      type: 'notification',
+      timestamp: Date.now()
+    };
+
+    setChats(prev => prev.map(c => {
+      if (String(c.id).toLowerCase().trim() === canonicalGroupId) {
+        return {
+          ...c,
+          members: updatedMembers,
+          messages: [...(c.messages || []), systemMsg]
+        };
+      }
+      return c;
+    }));
+
+    const updatedGroupMetadata = {
+      ...targetChat,
+      members: updatedMembers,
+      messages: [],
+      lastActivity: Date.now()
+    };
+
+    const { data: sysMsgData, error: sysMsgError } = await supabase.from('messages').insert({
+      id: systemMsg.id,
+      chat_id: canonicalGroupId,
+      sender_id: user.id.toLowerCase(),
+      content: { ...systemMsg, text: encrypt(systemMsg.text, canonicalGroupId) }
+    }).select('created_at').single();
+
+    if (sysMsgError) {
+      console.error('[ShadowTalk] Failed to insert demotion system message:', sysMsgError);
+      showToast('Failed to demote member', 'error');
+      return;
+    }
+
+    const serverDemoteTime = new Date(sysMsgData.created_at).getTime();
+
+    const updatePromises = updatedMembers.map(async (m) => {
+      try {
+        const { data: existing } = await supabase
+          .from('chats')
+          .select('chat_data')
+          .eq('owner_id', m.id.toLowerCase())
+          .eq('chat_id', canonicalGroupId)
+          .maybeSingle();
+
+        const baseChat = existing?.chat_data || updatedGroupMetadata;
+        await supabase.from('chats').upsert({
+          owner_id: m.id.toLowerCase(),
+          chat_id: canonicalGroupId,
+          chat_data: { ...baseChat, members: updatedMembers, messages: [], lastActivity: Date.now() }
+        }, { onConflict: 'owner_id, chat_id' });
+      } catch (e) {
+        console.error('[ShadowTalk] Background sync failed for member:', m.id, e);
+      }
+    });
+
+    Promise.all([
+      supabase.from('messages').insert({
+        chat_id: canonicalGroupId,
+        content: { ...systemMsg, text: encrypt(systemMsg.text, canonicalGroupId) }
+      }),
+      ...updatePromises
+    ]).catch(err => console.error('[ShadowTalk] Post-demotion sync error:', err));
+
+    if (chatSubRef.current) {
+      chatSubRef.current.send({
+        type: 'broadcast',
+        event: 'GROUP_SYNC',
+        payload: {
+          groupId: canonicalGroupId,
+          members: updatedMembers,
+          lastActivity: serverDemoteTime,
+          type: 'member_demoted'
+        }
+      });
+    }
+
+    showToast(`${memberToDemote.name} demoted to Member`);
+  };
   async function syncMissedMessages() {
     if (!user?.id || !navigator.onLine) return;
     console.log('[ShadowTalk] Syncing missed messages...');
@@ -5552,7 +5665,7 @@ export const AppProvider = ({ children }) => {
     globalWallpaper, setGlobalWallpaper,
     followSystem, setFollowSystem,
     chats, setChats, addMessage, editMessage, toggleReaction, createGroup, deleteMessage, bulkDeleteMessages, clearMessages, deleteChat, deleteContact,
-    blockContact, unblockContact, deleteContact, deleteGroup, leaveGroup, rejoinGroup, addMemberToGroup, removeMemberFromGroup, promoteMemberToAdmin, markAsRead, togglePin, updateChatSettings, updateGroupSettings,
+    blockContact, unblockContact, deleteContact, deleteGroup, leaveGroup, rejoinGroup, addMemberToGroup, removeMemberFromGroup, promoteMemberToAdmin, demoteAdminToMember, markAsRead, togglePin, updateChatSettings, updateGroupSettings,
     broadcastProfileUpdate,
     forwardMessage, toggleStarMessage, togglePinMessage, archiveChat, setTypingStatus, typingUsers,
     updateChatTheme,

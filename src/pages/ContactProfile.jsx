@@ -81,7 +81,7 @@ export default function ContactProfile() {
   const { 
     chats, setChats, user, togglePin, updateChatSettings, updateGroupSettings,
     clearMessages, deleteChat, deleteContact, 
-    blockContact, unblockContact, showToast, startCall, addMemberToGroup, removeMemberFromGroup, promoteMemberToAdmin, leaveGroup, deleteGroup,
+    blockContact, unblockContact, showToast, startCall, addMemberToGroup, removeMemberFromGroup, promoteMemberToAdmin, demoteAdminToMember, leaveGroup, deleteGroup,
     isLoading, downloadFile, bulkDeleteMessages, updateChatTheme, showConfirm
   } = useAppContext();
   
@@ -1136,7 +1136,7 @@ export default function ContactProfile() {
                   </button>
                 </div>
                 
-                {isAdmin && selectedMemberInfo.id !== user?.id && selectedMemberInfo.role !== 'admin' && selectedMemberInfo.id.toLowerCase() !== (chat.adminId || '').toLowerCase() && (
+                {isAdmin && selectedMemberInfo.id !== user?.id && selectedMemberInfo.id.toLowerCase() !== (chat.adminId || '').toLowerCase() && (chat.adminId === user?.id || selectedMemberInfo.role !== 'admin') && (
                   <button 
                     className="btn-secondary" 
                     style={{ 
@@ -1330,21 +1330,23 @@ export default function ContactProfile() {
           </div>
 
           <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
-            <p style={{ 
-              color: '#fff', 
-              fontSize: '0.95rem', 
-              fontWeight: 500,
-              textAlign: 'center', 
-              marginBottom: '24px', 
-              padding: '12px 16px',
-              backgroundColor: 'rgba(15, 17, 21, 0.9)',
-              borderLeft: '4px solid var(--accent-primary)',
-              borderRadius: '8px',
-              lineHeight: '1.4',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
-            }}>
-              Admins cannot be demoted or removed from the group.
-            </p>
+            {!isHeadAdmin && (
+              <p style={{ 
+                color: '#fff', 
+                fontSize: '0.95rem', 
+                fontWeight: 500,
+                textAlign: 'center', 
+                marginBottom: '24px', 
+                padding: '12px 16px',
+                backgroundColor: 'rgba(15, 17, 21, 0.9)',
+                borderLeft: '4px solid var(--accent-primary)',
+                borderRadius: '8px',
+                lineHeight: '1.4',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+              }}>
+                Only the head admin can demote or remove other admins.
+              </p>
+            )}
 
             <button 
               className="settings-item hoverable"
@@ -1405,14 +1407,14 @@ export default function ContactProfile() {
                 .filter(m => (m.role === 'admin' || m.id === chat.adminId) && m.name.toLowerCase().includes(adminSearchQuery.toLowerCase()))
                 .map(admin => {
                   const isMe = admin.id === user?.id;
+                  const isTargetHeadAdmin = admin.id === chat.adminId;
                   return (
                     <div 
                       key={admin.id} 
                       className="settings-item"
                       style={{ 
                         display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '16px', 
+                        flexDirection: 'column',
                         padding: '12px 16px', 
                         borderRadius: '12px',
                         marginBottom: '8px',
@@ -1420,31 +1422,54 @@ export default function ContactProfile() {
                         border: '1px solid rgba(255, 255, 255, 0.08)'
                       }}
                     >
-                      <div className="avatar" style={{ position: 'relative', width: 44, height: 44, borderRadius: '50%', overflow: 'visible', marginRight: 0 }}>
-                        <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden' }}>
-                          {(isMe ? user?.avatarUrl : admin.avatarUrl) ? (
-                            <img src={isMe ? user.avatarUrl : admin.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <DefaultAvatar name={admin.name} size={44} />
-                          )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div className="avatar" style={{ position: 'relative', width: 44, height: 44, borderRadius: '50%', overflow: 'visible', marginRight: 0 }}>
+                          <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden' }}>
+                            {(isMe ? user?.avatarUrl : admin.avatarUrl) ? (
+                              <img src={isMe ? user.avatarUrl : admin.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <DefaultAvatar name={admin.name} size={44} />
+                            )}
+                          </div>
+                          <div style={{ 
+                            position: 'absolute', bottom: -2, right: -2, 
+                            backgroundColor: isTargetHeadAdmin ? '#FF6B6B' : '#FFD700', borderRadius: '50%', 
+                            padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            border: '2px solid #000'
+                          }}>
+                            <CrownIcon size={10} color="#000" fill="#000" />
+                          </div>
                         </div>
-                        <div style={{ 
-                          position: 'absolute', bottom: -2, right: -2, 
-                          backgroundColor: '#FFD700', borderRadius: '50%', 
-                          padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          border: '2px solid #000'
-                        }}>
-                          <CrownIcon size={10} color="#000" fill="#000" />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {admin.name} {isMe && '(You)'} {isTargetHeadAdmin && <span style={{fontSize: '0.75rem', color: '#FF6B6B', marginLeft: '4px'}}>(Head)</span>}
+                          </span>
+                          <span style={{ fontSize: '0.8rem', color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {admin.shadowId || admin.name}
+                          </span>
                         </div>
                       </div>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {admin.name} {isMe && '(You)'}
-                        </span>
-                        <span style={{ fontSize: '0.8rem', color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {admin.shadowId || admin.name}
-                        </span>
-                      </div>
+                      
+                      {isHeadAdmin && !isTargetHeadAdmin && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px', width: '100%' }}>
+                          <button 
+                            className="btn-secondary" 
+                            style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+                            onClick={() => demoteAdminToMember(chat.id, admin.id)}
+                          >
+                            Demote to Member
+                          </button>
+                          <button 
+                            className="btn-secondary" 
+                            style={{ flex: 1, padding: '8px', fontSize: '0.85rem', color: 'var(--accent-danger)', borderColor: 'var(--accent-danger)', backgroundColor: 'rgba(255, 68, 68, 0.05)' }}
+                            onClick={() => {
+                              setConfirmAction({ type: 'remove_member', member: admin });
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
