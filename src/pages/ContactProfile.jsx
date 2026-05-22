@@ -396,7 +396,7 @@ export default function ContactProfile() {
 
   const isGroup = chat.type === 'group';
   const displayId = isGroup ? chat.id : (chat.contact?.shadowId || chat.contact?.id);
-  const isNoteToSelf = !isGroup && chat.id.toLowerCase() === (user?.shortId || user?.id || '').toLowerCase();
+  const isNoteToSelf = !isGroup && (chat.isSelf === true || chat.id.toLowerCase() === (user?.id || '').toLowerCase());
   const displayName = isNoteToSelf ? 'Note to Self' : (isGroup ? chat.name : (chat.contact?.nickname || chat.contact?.name || 'Unknown'));
   const isAdmin = isGroup && (chat.adminId === user?.id || (chat.members || []).some(m => m && (String(m.id).toLowerCase() === String(user?.id).toLowerCase() || (user?.shadowId && m.shadowId && String(m.shadowId).toLowerCase() === String(user?.shadowId).toLowerCase())) && m.role === 'admin'));
   const isHeadAdmin = isGroup && chat.adminId === user?.id;

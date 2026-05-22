@@ -2264,7 +2264,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const decrypt = (text, key) => {
-    if (!text || typeof text !== 'string' || !text.startsWith("🔐e2ee_")) return text;
+    if (!text) return '';
+    if (typeof text !== 'string' || !text.startsWith("🔐e2ee_")) return text;
     try {
       const encoded = text.replace("🔐e2ee_", "");
       const utf8Text = atob(encoded);

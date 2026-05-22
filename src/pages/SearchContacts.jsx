@@ -72,7 +72,7 @@ export default function SearchContacts() {
     if (!chat) return false;
     const isDirect = chat.type === 'direct';
     let contactName = chat.contact?.nickname || chat.contact?.name || chat.id || '';
-    if (chat.id === user?.id || chat.contact?.id === user?.id) contactName = 'Note to Self';
+    if (chat.isSelf || chat.id === user?.id || chat.contact?.id === user?.id) contactName = 'Note to Self';
     
     return isDirect && contactName.toLowerCase().includes((query || '').toLowerCase());
   });
@@ -81,7 +81,7 @@ export default function SearchContacts() {
   const grouped = filteredChats.reduce((acc, chat) => {
     let name = chat?.contact?.nickname || chat?.contact?.name || chat?.id || 'Unknown';
     const isGroup = chat?.type === 'group';
-    const isNoteToSelf = !isGroup && chat.id.toLowerCase() === (user?.shortId || user?.id || '').toLowerCase();
+    const isNoteToSelf = !isGroup && (chat.isSelf === true || chat.id.toLowerCase() === (user?.id || '').toLowerCase());
     if (isNoteToSelf) name = 'Note to Self';
     const letter = (name.charAt(0) || '?').toUpperCase();
     if (!acc[letter]) acc[letter] = [];
