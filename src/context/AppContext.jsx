@@ -4712,6 +4712,41 @@ export const AppProvider = ({ children }) => {
   const blockContact = async (chatId) => {
     if (!user?.id) return;
     await updateChatSettings(chatId, { isBlocked: true });
+
+    // Update recipient's chat data
+    try {
+      const { data: recipientChat } = await supabase
+        .from('chats')
+        .select('chat_data')
+        .eq('owner_id', chatId)
+        .eq('chat_id', user.id)
+        .maybeSingle();
+
+      if (recipientChat) {
+        const updatedData = { ...recipientChat.chat_data, isBlockedByOther: true };
+        await supabase
+          .from('chats')
+          .update({ chat_data: updatedData })
+          .eq('owner_id', chatId)
+          .eq('chat_id', user.id);
+      }
+    } catch (e) {
+      console.error('[ShadowTalk] Error updating recipient chat data:', e);
+    }
+
+    // Broadcast status change
+    const privacyChannel = supabase.channel(`privacy_${chatId.toLowerCase()}`);
+    privacyChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await privacyChannel.send({
+          type: 'broadcast',
+          event: 'status_change',
+          payload: { userId: user.id, isBlocked: true }
+        });
+        setTimeout(() => supabase.removeChannel(privacyChannel), 3000);
+      }
+    });
+
     showToast('Contact blocked');
   };
 
@@ -4729,6 +4764,41 @@ export const AppProvider = ({ children }) => {
     }));
 
     await updateChatSettings(chatId, { isBlocked: false, lastActivity: Date.now() });
+
+    // Update recipient's chat data
+    try {
+      const { data: recipientChat } = await supabase
+        .from('chats')
+        .select('chat_data')
+        .eq('owner_id', chatId)
+        .eq('chat_id', user.id)
+        .maybeSingle();
+
+      if (recipientChat) {
+        const updatedData = { ...recipientChat.chat_data, isBlockedByOther: false };
+        await supabase
+          .from('chats')
+          .update({ chat_data: updatedData })
+          .eq('owner_id', chatId)
+          .eq('chat_id', user.id);
+      }
+    } catch (e) {
+      console.error('[ShadowTalk] Error updating recipient chat data:', e);
+    }
+
+    // Broadcast status change
+    const privacyChannel = supabase.channel(`privacy_${chatId.toLowerCase()}`);
+    privacyChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await privacyChannel.send({
+          type: 'broadcast',
+          event: 'status_change',
+          payload: { userId: user.id, isBlocked: false }
+        });
+        setTimeout(() => supabase.removeChannel(privacyChannel), 3000);
+      }
+    });
+
     showToast('Contact unblocked');
   };
 
