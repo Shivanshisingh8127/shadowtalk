@@ -1136,7 +1136,7 @@ export default function ContactProfile() {
                   </button>
                 </div>
                 
-                {isAdmin && selectedMemberInfo.id !== user?.id && (
+                {isAdmin && selectedMemberInfo.id !== user?.id && selectedMemberInfo.role !== 'admin' && selectedMemberInfo.id.toLowerCase() !== (chat.adminId || '').toLowerCase() && (
                   <button 
                     className="btn-secondary" 
                     style={{ 
