@@ -826,24 +826,38 @@ export default function ContactProfile() {
                       <div style={{ fontWeight: 600, marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{msg.media.name || 'Untitled Document'}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(msg.timestamp).toLocaleDateString()}</div>
                     </div>
-                    <button 
-                      className="icon-btn" 
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const confirmed = await showConfirm({
-                          title: 'Delete File?',
-                          message: 'Are you sure you want to delete this file?',
-                          icon: Trash2Icon
-                        });
-                        if (confirmed) {
-                          await bulkDeleteMessages(id, [msg.id], false);
-                          showToast('File deleted', 'success');
-                        }
-                      }}
-                      style={{ color: 'var(--accent-danger)' }}
-                    >
-                      <Trash2Icon size={20} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button 
+                        className="icon-btn" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadFile(msg.media.url, msg.media.name);
+                        }}
+                        style={{ color: 'var(--accent-primary)' }}
+                        title="Download file"
+                      >
+                        <DownloadIcon size={20} />
+                      </button>
+                      <button 
+                        className="icon-btn" 
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const confirmed = await showConfirm({
+                            title: 'Delete File?',
+                            message: 'Are you sure you want to delete this file?',
+                            icon: Trash2Icon
+                          });
+                          if (confirmed) {
+                            await bulkDeleteMessages(id, [msg.id], false);
+                            showToast('File deleted', 'success');
+                          }
+                        }}
+                        style={{ color: 'var(--accent-danger)' }}
+                        title="Delete file"
+                      >
+                        <Trash2Icon size={20} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
