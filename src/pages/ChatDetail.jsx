@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft as ArrowLeftIcon, 
@@ -1176,20 +1176,30 @@ export default function ChatDetail() {
 
   const [initialUnreadCount, setInitialUnreadCount] = useState(0);
 
-  useEffect(() => {
-    const handleRead = () => {
-      if (safeChat && safeChat.unreadCount > 0 && document.visibilityState === 'visible') {
-        if (initialUnreadCount === 0) {
-          setInitialUnreadCount(safeChat.unreadCount);
-        }
-        markAsRead(id);
+  // Track whether the user has scrolled to the bottom to read messages.
+  // markAsRead is ONLY called when the user is at the bottom and the page is visible.
+  // This prevents messages from being auto-marked as seen without the receiver viewing them.
+  const triggerMarkAsReadIfAtBottom = useCallback(() => {
+    if (!safeChat || !id) return;
+    if (safeChat.unreadCount <= 0) return;
+    if (document.visibilityState !== 'visible') return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 60;
+    if (isAtBottom) {
+      if (initialUnreadCount === 0) {
+        setInitialUnreadCount(safeChat.unreadCount);
       }
-    };
-    
-    handleRead(); // initial check
-    document.addEventListener('visibilitychange', handleRead);
-    return () => document.removeEventListener('visibilitychange', handleRead);
-  }, [safeChat?.unreadCount, id, initialUnreadCount, markAsRead]);
+      markAsRead(id);
+    }
+  }, [safeChat, id, initialUnreadCount, markAsRead]);
+
+  // When user comes back to the tab, re-check if they are at the bottom
+  useEffect(() => {
+    const handleVisibility = () => triggerMarkAsReadIfAtBottom();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [triggerMarkAsReadIfAtBottom]);
 
   // Reset resolution state when switching chats
   useEffect(() => {
@@ -1226,6 +1236,10 @@ export default function ChatDetail() {
       if (!hasInitialScrolled && currentCount > 0) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
         setHasInitialScrolled(true);
+        // User just opened this chat and it scrolled to bottom — they are reading
+        if (safeChat?.unreadCount > 0 && document.visibilityState === 'visible') {
+          markAsRead(id);
+        }
       } else if (currentCount > prevCount || (currentActivity > prevActivity && prevActivity > 0)) {
         // A NEW message actually arrived (either list grew or activity updated)
         const isActuallyMe = lastMessage?.senderId && 
@@ -1249,6 +1263,10 @@ export default function ChatDetail() {
               }
             }, 100);
             setNewMessagesCount(0);
+            // Receiver is at the bottom, they see the new message — mark as read
+            if (safeChat?.unreadCount > 0 && document.visibilityState === 'visible') {
+              markAsRead(id);
+            }
           } else {
             // If not at bottom, show unread count
             const added = currentCount - prevCount;
@@ -1261,19 +1279,24 @@ export default function ChatDetail() {
       prevMessagesCountRef.current = currentCount;
       prevLastActivityRef.current = currentActivity;
     }
-  }, [chatMessages.length, id, hasInitialScrolled]);
+  }, [chatMessages.length, id, hasInitialScrolled, markAsRead, safeChat?.unreadCount]);
 
   const handleScroll = () => {
     if (scrollContainerRef.current) {
       const container = scrollContainerRef.current;
       // Use a stricter threshold for clearing unread count (must be very close to bottom)
-      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 40;
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 60;
       const isGenerallyAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
       
       setShowScrollBottomBtn(!isGenerallyAtBottom);
       
       if (isAtBottom && newMessagesCount > 0) {
         setNewMessagesCount(0);
+      }
+
+      // Mark messages as read only when receiver has scrolled to the bottom
+      if (isAtBottom) {
+        triggerMarkAsReadIfAtBottom();
       }
     }
   };
@@ -1282,6 +1305,10 @@ export default function ChatDetail() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     setNewMessagesCount(0);
     setShowScrollBottomBtn(false);
+    // User explicitly scrolled to bottom - mark messages as read
+    if (safeChat?.unreadCount > 0 && document.visibilityState === 'visible') {
+      markAsRead(id);
+    }
   };
 
 
