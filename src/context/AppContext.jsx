@@ -2645,7 +2645,15 @@ export const AppProvider = ({ children }) => {
   };
 
   const loginMockUser = async (customName, customId, customPhrase, silent = false) => {
-    if (!silent) setIsLoading(true);
+    if (!silent) {
+      // Full login: clear all previous session state immediately so no data
+      // from the old account leaks into the new one during the async load.
+      setChats([]);
+      chatsRef.current = [];
+      setRequests([]);
+      setTypingUsers({});
+      setIsLoading(true);
+    }
     const inputId = (customId || '').trim().toLowerCase();
     try {
       if (!navigator.onLine) {
@@ -3120,8 +3128,16 @@ export const AppProvider = ({ children }) => {
     }
   };
   const logout = () => {
+    // Clear all in-memory state immediately so the old user's data
+    // cannot be seen by or merged into the next account.
+    setChats([]);
+    chatsRef.current = [];
+    setRequests([]);
+    setTypingUsers({});
     setUser(null);
     setSettings(prev => ({ ...prev, lockApp: false }));
+    // Clear persisted user session from localStorage
+    localStorage.removeItem('shadowtalk_user');
   };
 
   const acceptRequest = async (request) => {
