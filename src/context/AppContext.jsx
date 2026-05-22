@@ -1054,6 +1054,9 @@ export const AppProvider = ({ children }) => {
                 if (decodedChat.status === 'removed' && decodedChat.removedAt) {
                   return msgTime <= decodedChat.removedAt;
                 }
+                if (decodedChat.deletedForMe?.includes(m.id)) {
+                  return false;
+                }
                 return true;
               });
 
@@ -4549,7 +4552,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // 1b. BROADCAST the deletion to ensure real-time sync (even if DB events are slow/incomplete)
-      if (chatSubRef.current) {
+      if (forEveryone && chatSubRef.current) {
         chatSubRef.current.send({
           type: 'broadcast',
           event: 'MESSAGE_DELETED',
