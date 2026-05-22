@@ -1184,13 +1184,19 @@ export default function ChatDetail() {
   const [initialUnreadCount, setInitialUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (safeChat && safeChat.unreadCount > 0) {
-      if (initialUnreadCount === 0) {
-        setInitialUnreadCount(safeChat.unreadCount);
+    const handleRead = () => {
+      if (safeChat && safeChat.unreadCount > 0 && document.visibilityState === 'visible') {
+        if (initialUnreadCount === 0) {
+          setInitialUnreadCount(safeChat.unreadCount);
+        }
+        markAsRead(id);
       }
-      markAsRead(id);
-    }
-  }, [safeChat?.unreadCount, id]);
+    };
+    
+    handleRead(); // initial check
+    document.addEventListener('visibilitychange', handleRead);
+    return () => document.removeEventListener('visibilitychange', handleRead);
+  }, [safeChat?.unreadCount, id, initialUnreadCount, markAsRead]);
 
   // Reset resolution state when switching chats
   useEffect(() => {

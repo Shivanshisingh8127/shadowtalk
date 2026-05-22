@@ -2095,7 +2095,7 @@ export const AppProvider = ({ children }) => {
             (c.contact?.id && String(c.contact.id).toLowerCase() === String(activeChatIdRef.current).toLowerCase()) ||
             (c.contact?.shadowId && String(c.contact.shadowId).toLowerCase() === String(activeChatIdRef.current).toLowerCase())
           );
-          const isViewingThisChat = activeChat && (
+          const isViewingThisChat = activeChat && document.visibilityState === 'visible' && (
             activeChat.id.toLowerCase() === gid ||
             (activeChat.contact?.id && activeChat.contact.id.toLowerCase() === gid) ||
             (activeChat.contact?.shadowId && activeChat.contact.shadowId.toLowerCase() === gid)
@@ -2452,7 +2452,7 @@ export const AppProvider = ({ children }) => {
         );
         
         incomingMessages.forEach(m => {
-          const isViewingThisChat = activeChatIdRef.current && (
+          const isViewingThisChat = activeChatIdRef.current && document.visibilityState === 'visible' && (
             String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase() ||
             (chat.contact?.id && String(activeChatIdRef.current).toLowerCase() === chat.contact.id.toLowerCase()) ||
             (chat.contact?.shadowId && String(activeChatIdRef.current).toLowerCase() === chat.contact.shadowId.toLowerCase())
@@ -2550,7 +2550,7 @@ export const AppProvider = ({ children }) => {
         );
         
         incomingMessages.forEach(m => {
-          const isViewingThisChat = activeChatIdRef.current && (
+          const isViewingThisChat = activeChatIdRef.current && document.visibilityState === 'visible' && (
             String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase()
           );
           
@@ -2622,7 +2622,7 @@ export const AppProvider = ({ children }) => {
           const isFromMe = m.senderId?.toLowerCase() === myIdLower;
           if (isFromMe) return m;
 
-          const isViewingThisChat = activeChatIdRef.current && (
+          const isViewingThisChat = activeChatIdRef.current && document.visibilityState === 'visible' && (
             String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase() ||
             (chat.contact?.id && String(activeChatIdRef.current).toLowerCase() === chat.contact.id.toLowerCase()) ||
             (chat.contact?.shadowId && String(activeChatIdRef.current).toLowerCase() === chat.contact.shadowId.toLowerCase())
