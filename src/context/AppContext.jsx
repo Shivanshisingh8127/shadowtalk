@@ -1163,7 +1163,8 @@ export const AppProvider = ({ children }) => {
                 const statusChanged = currentMsg.status !== decryptedMsgContent.status || currentMsg.read !== decryptedMsgContent.read;
                 const deliveredChanged = JSON.stringify(currentMsg.deliveredTo) !== JSON.stringify(decryptedMsgContent.deliveredTo) ||
                                          JSON.stringify(currentMsg.seenBy) !== JSON.stringify(decryptedMsgContent.seenBy);
-                if (statusChanged || deliveredChanged) {
+                const reactionsChanged = JSON.stringify(currentMsg.reactions || {}) !== JSON.stringify(decryptedMsgContent.reactions || {});
+                if (statusChanged || deliveredChanged || reactionsChanged) {
                   changed = true;
                   const newMsgs = [...msgs];
                   newMsgs[idx] = { ...currentMsg, ...decryptedMsgContent };
@@ -1251,7 +1252,8 @@ export const AppProvider = ({ children }) => {
                   const statusChanged = currentMsg.status !== decryptedMsgContent.status || currentMsg.read !== decryptedMsgContent.read;
                   const deliveredChanged = JSON.stringify(currentMsg.deliveredTo) !== JSON.stringify(decryptedMsgContent.deliveredTo) ||
                                            JSON.stringify(currentMsg.seenBy) !== JSON.stringify(decryptedMsgContent.seenBy);
-                  if (statusChanged || deliveredChanged) {
+                  const reactionsChanged = JSON.stringify(currentMsg.reactions || {}) !== JSON.stringify(decryptedMsgContent.reactions || {});
+                  if (statusChanged || deliveredChanged || reactionsChanged) {
                     changed = true;
                     const newMsgs = [...msgs];
                     newMsgs[idx] = { ...currentMsg, ...decryptedMsgContent };
@@ -1364,10 +1366,12 @@ export const AppProvider = ({ children }) => {
       const myId = userRef.current?.id?.toLowerCase();
       if (!myId) return;
 
+      // Skip if this is our own broadcast — we already updated local state in toggleReaction
+      if (userId.toLowerCase() === myId) return;
+
       // Determine local gid (chat ID in our local state)
       const isGroup = String(chatId).toLowerCase().startsWith('group_');
-      const gid = isGroup ? chatId.toLowerCase() :
-        (userId.toLowerCase() === myId ? chatId.toLowerCase() : userId.toLowerCase());
+      const gid = isGroup ? chatId.toLowerCase() : userId.toLowerCase();
 
       setChats(prev => prev.map(chat => {
         if (chat.id.toLowerCase() === gid) {
