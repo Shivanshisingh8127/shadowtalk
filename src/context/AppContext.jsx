@@ -1398,7 +1398,7 @@ export const AppProvider = ({ children }) => {
           if (!amIInGroup && chat.status !== 'removed') {
             updatedChat.status = 'removed';
             updatedChat.exitType = 'removed';
-            updatedChat.removedAt = Date.now();
+            updatedChat.removedAt = lastActivity || Date.now();
             
             let intervals = [...(updatedChat.membershipIntervals || [])];
             if (intervals.length > 0 && !intervals[intervals.length - 1].removedAt) {
@@ -1413,6 +1413,26 @@ export const AppProvider = ({ children }) => {
               chat_data: updatedChat
             }, { onConflict: 'owner_id, chat_id' }).then(() => {
               console.log('[ShadowTalk] Self-updated DB row to removed status via GROUP_SYNC');
+            });
+          } else if (amIInGroup && type === 'member_added' && chat.status === 'removed') {
+            // I was added back to the group!
+            updatedChat.status = 'active';
+            updatedChat.removedAt = null;
+            let intervals = [...(updatedChat.membershipIntervals || [])];
+            // Ensure previous interval is closed
+            if (intervals.length > 0 && !intervals[intervals.length - 1].removedAt) {
+              intervals[intervals.length - 1].removedAt = lastActivity || Date.now();
+            }
+            intervals.push({ joinedAt: lastActivity || Date.now(), removedAt: null });
+            updatedChat.membershipIntervals = intervals;
+
+            // Self-update DB row asynchronously
+            supabase.from('chats').upsert({
+              owner_id: user.id.toLowerCase(),
+              chat_id: groupId,
+              chat_data: updatedChat
+            }, { onConflict: 'owner_id, chat_id' }).then(() => {
+              console.log('[ShadowTalk] Self-updated DB row to active status via GROUP_SYNC');
             });
           }
 
@@ -5024,9 +5044,24 @@ export const AppProvider = ({ children }) => {
     await Promise.all(updatePromises);
 
     // Update local state if I am the admin who added
-    setChats(prev => prev.map(c =>
-      c.id.toLowerCase().trim() === canonicalGroupId ? { ...c, members: updatedGroupMetadata.members } : c
-    ));
+    setChats(prev => prev.map(c => {
+      if (c.id.toLowerCase().trim() === canonicalGroupId) {
+        let memberSpecificData = { ...c, members: updatedGroupMetadata.members };
+        // If I added MYSELF (e.g. testing or weird edge case), update my intervals too
+        if (finalId === user.id.toLowerCase()) {
+          let intervals = [...(memberSpecificData.membershipIntervals || [])];
+          if (intervals.length > 0 && !intervals[intervals.length - 1].removedAt) {
+            intervals[intervals.length - 1].removedAt = strictJoinTime;
+          }
+          intervals.push({ joinedAt: strictJoinTime, removedAt: null });
+          memberSpecificData.membershipIntervals = intervals;
+          memberSpecificData.removedAt = null;
+          memberSpecificData.status = 'active';
+        }
+        return memberSpecificData;
+      }
+      return c;
+    }));
 
     // 5. Broadcast to others for instant UI update
     if (chatSubRef.current) {
@@ -5158,6 +5193,8 @@ export const AppProvider = ({ children }) => {
       // Update ALL rows in the group to have the new members array
       // This ensures even offline removed members get locked out when they fetch their row
       const updateAllPromises = allGroupChats.map(async (c) => {
+        // DO NOT overwrite the removed member's row here, because we already updated their interval!
+        if (c.owner_id === memberIdLower) return;
         const newChatData = { ...c.chat_data, members: updatedMembers };
         await supabase.from('chats').update({ chat_data: newChatData })
           .eq('owner_id', c.owner_id)
@@ -5187,6 +5224,19 @@ export const AppProvider = ({ children }) => {
         }
       });
     }
+
+    // Update the SENDER'S local state immediately
+    setChats(prev => prev.map(c => {
+      if (c.id.toLowerCase() === canonicalGroupId) {
+        return {
+          ...c,
+          members: updatedMembers,
+          lastActivity: removedAt,
+          messages: [...(c.messages || []), systemMsg]
+        };
+      }
+      return c;
+    }));
 
     showToast(`${memberToRemove.name} removed from group`);
   };
