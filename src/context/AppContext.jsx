@@ -1314,7 +1314,7 @@ export const AppProvider = ({ children }) => {
     });
 
     chatSub.on('broadcast', { event: 'MESSAGE_STATUS_UPDATE' }, (payload) => {
-      const { chatId, messageIds, status } = payload.payload;
+      const { chatId, messageIds, status, readerId } = payload.payload;
       console.log('[ShadowTalk] Status broadcast:', status, messageIds);
       setChats(prev => prev.map(chat => {
         const cid = chatId.toLowerCase();
@@ -1324,9 +1324,25 @@ export const AppProvider = ({ children }) => {
         if (isMatch) {
           return {
             ...chat,
-            messages: (chat.messages || []).map(m =>
-              messageIds.includes(m.id) ? { ...m, status, read: status === 'seen' } : m
-            )
+            messages: (chat.messages || []).map(m => {
+              if (messageIds.includes(m.id)) {
+                if (chat.type === 'group' && readerId) {
+                  const rId = readerId.toLowerCase();
+                  const arrName = status === 'seen' ? 'seenBy' : 'deliveredTo';
+                  const currentArr = m[arrName] || [];
+                  const newArr = Array.from(new Set([...currentArr, rId]));
+                  
+                  const otherArrName = status === 'seen' ? 'deliveredTo' : 'seenBy';
+                  const otherArr = m[otherArrName] || [];
+                  const finalOther = status === 'seen' ? Array.from(new Set([...otherArr, rId])) : otherArr;
+                  
+                  return { ...m, [arrName]: newArr, [otherArrName]: finalOther };
+                } else {
+                  return { ...m, status, read: status === 'seen' };
+                }
+              }
+              return m;
+            })
           };
         }
         return chat;
@@ -2087,14 +2103,15 @@ export const AppProvider = ({ children }) => {
                 }
 
                 const targetStatus = (settingsRef.current?.readReceipts !== false) ? 'seen' : 'delivered';
+                const keyToUse = decryptedMsg.dbChatId || gid;
                 const dbContent = {
                   ...decryptedMsg,
                   status: targetStatus,
                   read: (targetStatus === 'seen'),
-                  text: encrypt(decryptedMsg.text, gid),
+                  text: encrypt(decryptedMsg.text, keyToUse),
                   replyTo: decryptedMsg.replyTo ? {
                     ...decryptedMsg.replyTo,
-                    text: encrypt(decryptedMsg.replyTo.text, gid)
+                    text: encrypt(decryptedMsg.replyTo.text, keyToUse)
                   } : null
                 };
                 supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
@@ -2106,6 +2123,7 @@ export const AppProvider = ({ children }) => {
                     event: 'MESSAGE_STATUS_UPDATE',
                     payload: {
                       chatId: myId,
+                      readerId: myId,
                       messageIds: [msg.id],
                       status: targetStatus
                     }
@@ -2125,12 +2143,13 @@ export const AppProvider = ({ children }) => {
             } else {
               if (decryptedMsg.status === 'sent') {
                 decryptedMsg.status = 'delivered';
+                const keyToUse = decryptedMsg.dbChatId || gid;
                 const dbContent = {
                   ...decryptedMsg,
-                  text: encrypt(decryptedMsg.text, gid),
+                  text: encrypt(decryptedMsg.text, keyToUse),
                   replyTo: decryptedMsg.replyTo ? {
                     ...decryptedMsg.replyTo,
-                    text: encrypt(decryptedMsg.replyTo.text, gid)
+                    text: encrypt(decryptedMsg.replyTo.text, keyToUse)
                   } : null
                 };
                 supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then();
@@ -2142,6 +2161,7 @@ export const AppProvider = ({ children }) => {
                     event: 'MESSAGE_STATUS_UPDATE',
                     payload: {
                       chatId: myId,
+                      readerId: myId,
                       messageIds: [msg.id],
                       status: 'delivered'
                     }
@@ -2472,23 +2492,34 @@ export const AppProvider = ({ children }) => {
           }
 
           if (shouldUpdateDb && dbStatus !== m.status) {
-            const dbRead = dbStatus === 'seen';
-            const updatedContent = { ...m, status: dbStatus, read: dbRead };
-            if (dbRead && m.deleteAfterRead && !m.deleteAt) {
-              updatedContent.deleteAt = Date.now() + (m.disappearDuration || 3600000);
+            if (chat.type === 'group') {
+              promises.push(
+                supabase.rpc('append_message_status', {
+                  msg_id: m.id,
+                  user_id: userId,
+                  status_type: dbStatus
+                })
+              );
+            } else {
+              const dbRead = dbStatus === 'seen';
+              const updatedContent = { ...m, status: dbStatus, read: dbRead };
+              if (dbRead && m.deleteAfterRead && !m.deleteAt) {
+                updatedContent.deleteAt = Date.now() + (m.disappearDuration || 3600000);
+              }
+              
+              const keyToUse = m.dbChatId || chat.id.toLowerCase();
+              const encrypted = {
+                ...updatedContent,
+                text: encrypt(updatedContent.text, keyToUse),
+                replyTo: updatedContent.replyTo ? {
+                  ...updatedContent.replyTo,
+                  text: encrypt(updatedContent.replyTo.text, keyToUse)
+                } : null
+              };
+              promises.push(
+                supabase.from('messages').update({ content: encrypted }).eq('id', m.id)
+              );
             }
-            
-            const encrypted = {
-              ...updatedContent,
-              text: encrypt(updatedContent.text, chat.id.toLowerCase()),
-              replyTo: updatedContent.replyTo ? {
-                ...updatedContent.replyTo,
-                text: encrypt(updatedContent.replyTo.text, chat.id.toLowerCase())
-              } : null
-            };
-            promises.push(
-              supabase.from('messages').update({ content: encrypted }).eq('id', m.id)
-            );
 
             // Socket.io emit if B marks message as seen
             if (dbStatus === 'seen' && settingsRef.current?.readReceipts !== false && socketRef.current && socketRef.current.connected) {
@@ -2553,7 +2584,8 @@ export const AppProvider = ({ children }) => {
           type: 'broadcast',
           event: 'MESSAGE_STATUS_UPDATE',
           payload: {
-            chatId: myIdLower,
+            chatId: chat?.type === 'group' ? cid : myIdLower,
+            readerId: myIdLower,
             messageIds: data.seen,
             status: 'seen'
           }
@@ -2564,7 +2596,8 @@ export const AppProvider = ({ children }) => {
           type: 'broadcast',
           event: 'MESSAGE_STATUS_UPDATE',
           payload: {
-            chatId: myIdLower,
+            chatId: chat?.type === 'group' ? cid : myIdLower,
+            readerId: myIdLower,
             messageIds: data.delivered,
             status: 'delivered'
           }
@@ -3555,6 +3588,71 @@ export const AppProvider = ({ children }) => {
           showToast('Direct messages are currently disabled by group admin.', 'error');
           return;
         }
+
+        // Fallback: If no blocking group found in local state, check DB directly.
+        // This catches the case where sender's local state is stale (missed the broadcast).
+        if (!blockingGroup) {
+          const sharedGroupIds = currentChats
+            .filter(c => c && c.type === 'group' && (c.members || []).length >= 2)
+            .filter(c => {
+              const members = c.members || [];
+              const myMatch = members.some(m => m && String(m.id).toLowerCase() === myId);
+              const otherMatch = members.some(m => m && String(m.id).toLowerCase() === otherId);
+              return myMatch && otherMatch;
+            })
+            .map(c => c.id.toLowerCase());
+
+          if (sharedGroupIds.length > 0) {
+            try {
+              const { data: groupRows } = await supabase
+                .from('chats')
+                .select('owner_id, chat_id, chat_data')
+                .in('chat_id', sharedGroupIds);
+
+              if (groupRows && groupRows.length > 0) {
+                for (const sharedGroupId of sharedGroupIds) {
+                  const rowsForGroup = groupRows.filter(r => r.chat_id === sharedGroupId);
+                  if (rowsForGroup.length === 0) continue;
+
+                  // Prefer admin's row as authoritative
+                  let authoritative = rowsForGroup.find(r => {
+                    const cd = r.chat_data;
+                    return cd && String(cd.adminId).toLowerCase() === r.owner_id.toLowerCase();
+                  }) || rowsForGroup[0];
+
+                  const cd = authoritative.chat_data;
+                  if (!cd) continue;
+
+                  const isDisabled = cd.allow_member_dm === false || cd.allowMemberDMs === false;
+                  if (!isDisabled) continue;
+
+                  const members = cd.members || [];
+                  const adminId = String(cd.adminId || '').toLowerCase();
+                  const myMember = members.find(m => m && String(m.id).toLowerCase() === myId);
+                  const otherMember = members.find(m => m && String(m.id).toLowerCase() === otherId);
+                  if (!myMember || !otherMember) continue;
+
+                  const isMeAdmin = adminId === myId || (myMember && myMember.role === 'admin');
+                  const isOtherAdminDB = adminId === otherId || (otherMember && otherMember.role === 'admin');
+                  if (isMeAdmin || isOtherAdminDB) continue;
+
+                  console.warn('[ShadowTalk] DB check: Member DMs disabled in group', sharedGroupId);
+                  // Sync back into local state so subsequent calls don't need DB
+                  setChats(prev => prev.map(c => {
+                    if (String(c.id).toLowerCase() === sharedGroupId) {
+                      return { ...c, allow_member_dm: false, allowMemberDMs: false };
+                    }
+                    return c;
+                  }));
+                  showToast('Direct messages are currently disabled by group admin.', 'error');
+                  return;
+                }
+              }
+            } catch (dbErr) {
+              console.warn('[ShadowTalk] DB DM restriction check failed:', dbErr);
+            }
+          }
+        }
       }
     }
 
@@ -3974,7 +4072,8 @@ export const AppProvider = ({ children }) => {
         type: 'broadcast',
         event: 'MESSAGE_STATUS_UPDATE',
         payload: {
-          chatId: userRef.current?.id?.toLowerCase(), // Tell the sender that messages in our chat with them are seen
+          chatId: targetChat.type === 'group' ? actualChatId : userRef.current?.id?.toLowerCase(),
+          readerId: userRef.current?.id?.toLowerCase(),
           messageIds: unreadMsgIds,
           status: 'seen'
         }
@@ -3983,6 +4082,14 @@ export const AppProvider = ({ children }) => {
     }
 
     const updatePromises = unreadMessages.map(async m => {
+      if (targetChat.type === 'group') {
+        return supabase.rpc('append_message_status', {
+          msg_id: m.id,
+          user_id: user.id.toLowerCase(),
+          status_type: 'seen'
+        });
+      }
+
       const updatedContent = { ...m, read: true, status: 'seen' };
 
       // Trigger disappearance timer if needed
@@ -3990,12 +4097,13 @@ export const AppProvider = ({ children }) => {
         updatedContent.deleteAt = now + (m.disappearDuration || 3600000);
       }
 
+      const keyToUse = m.dbChatId || actualChatId;
       const dbContent = {
         ...updatedContent,
-        text: encrypt(updatedContent.text, actualChatId),
+        text: encrypt(updatedContent.text, keyToUse),
         replyTo: updatedContent.replyTo ? {
           ...updatedContent.replyTo,
-          text: encrypt(updatedContent.replyTo.text, actualChatId)
+          text: encrypt(updatedContent.replyTo.text, keyToUse)
         } : null
       };
 
