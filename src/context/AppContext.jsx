@@ -2088,7 +2088,7 @@ export const AppProvider = ({ children }) => {
           decryptedMsg = { ...messageContent, id: msg.id, senderId: msg.sender_id, timestamp: Date.now() };
         }
 
-        // Live Ticks Auto-Seen & Auto-Delivered on INSERT
+        // Live Ticks Auto-Delivered on INSERT
         if (payload.eventType === 'INSERT' && msg.sender_id?.toLowerCase() !== myId?.toLowerCase()) {
           const activeChat = (chatsRef.current || chats || []).find(c =>
             String(c.id).toLowerCase() === String(activeChatIdRef.current).toLowerCase() ||
@@ -2100,102 +2100,46 @@ export const AppProvider = ({ children }) => {
             (activeChat.contact?.id && activeChat.contact.id.toLowerCase() === gid) ||
             (activeChat.contact?.shadowId && activeChat.contact.shadowId.toLowerCase() === gid)
           );
+
           if (!isGroup) {
-            if (isViewingThisChat) {
-              if (decryptedMsg.status !== 'seen') {
-                decryptedMsg.status = 'seen';
-                decryptedMsg.read = true;
-                if (decryptedMsg.deleteAfterRead && !decryptedMsg.deleteAt) {
-                  decryptedMsg.deleteAt = Date.now() + (decryptedMsg.disappearDuration || 3600000);
-                }
+            // Only ever mark as delivered in the background. 'seen' is strictly handled by markAsRead when chat is opened.
+            if (decryptedMsg.status === 'sent') {
+              decryptedMsg.status = 'delivered';
+              decryptedMsg.read = false;
 
-                const targetStatus = (settingsRef.current?.readReceipts !== false) ? 'seen' : 'delivered';
-                const keyToUse = decryptedMsg.dbChatId || gid;
-                const dbContent = {
-                  ...decryptedMsg,
-                  status: targetStatus,
-                  read: (targetStatus === 'seen'),
-                  text: encrypt(decryptedMsg.text, keyToUse),
-                  replyTo: decryptedMsg.replyTo ? {
-                    ...decryptedMsg.replyTo,
-                    text: encrypt(decryptedMsg.replyTo.text, keyToUse)
-                  } : null
-                };
-                supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).catch(() => {});
-                supabase.rpc('append_message_status', { msg_id: msg.id, user_id: myId, status_type: targetStatus }).catch(() => {});
+              const dbContent = {
+                ...decryptedMsg,
+                text: encrypt(decryptedMsg.text, msg.chat_id.toLowerCase()),
+                replyTo: decryptedMsg.replyTo ? {
+                  ...decryptedMsg.replyTo,
+                  text: encrypt(decryptedMsg.replyTo.text, msg.chat_id.toLowerCase())
+                } : null
+              };
+              supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).catch(() => {});
+              supabase.rpc('append_message_status', { msg_id: msg.id, user_id: myId, status_type: 'delivered' }).catch(() => {});
 
-                // Broadcast status back to the sender
-                if (chatSubRef.current) {
-                  chatSubRef.current.send({
-                    type: 'broadcast',
-                    event: 'MESSAGE_STATUS_UPDATE',
-                    payload: {
-                      chatId: myId,
-                      readerId: myId,
-                      messageIds: [msg.id],
-                      status: targetStatus
-                    }
-                  });
-                }
-
-                // Emit "message_seen" socket event to socket.io if read receipts are ON
-                if (settingsRef.current?.readReceipts !== false && socketRef.current && socketRef.current.connected) {
-                  socketRef.current.emit('message_seen', {
+              // Broadcast delivered status back to the sender
+              if (chatSubRef.current) {
+                chatSubRef.current.send({
+                  type: 'broadcast',
+                  event: 'MESSAGE_STATUS_UPDATE',
+                  payload: {
+                    chatId: myId,
+                    readerId: myId,
                     messageIds: [msg.id],
-                    chatId: gid,
-                    senderId: msg.sender_id,
-                    receiverId: myId
-                  });
-                }
-              }
-            } else {
-              if (decryptedMsg.status === 'sent') {
-                decryptedMsg.status = 'delivered';
-                const keyToUse = decryptedMsg.dbChatId || gid;
-                const dbContent = {
-                  ...decryptedMsg,
-                  text: encrypt(decryptedMsg.text, keyToUse),
-                  replyTo: decryptedMsg.replyTo ? {
-                    ...decryptedMsg.replyTo,
-                    text: encrypt(decryptedMsg.replyTo.text, keyToUse)
-                  } : null
-                };
-                supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).catch(() => {});
-                supabase.rpc('append_message_status', { msg_id: msg.id, user_id: myId, status_type: targetStatus }).catch(() => {});
-
-                // Broadcast delivered status back to the sender
-                if (chatSubRef.current) {
-                  chatSubRef.current.send({
-                    type: 'broadcast',
-                    event: 'MESSAGE_STATUS_UPDATE',
-                    payload: {
-                      chatId: myId,
-                      readerId: myId,
-                      messageIds: [msg.id],
-                      status: 'delivered'
-                    }
-                  });
-                }
+                    status: 'delivered'
+                  }
+                });
               }
             }
           } else {
-            // Group Chat Live Ticks
-            if (isViewingThisChat) {
-              console.log(`[ShadowTalk] Marking group message ${msg.id} as seen (live)`);
-              const targetStatus = (settingsRef.current?.readReceipts !== false) ? 'seen' : 'delivered';
-              supabase.rpc('append_message_status', {
-                msg_id: msg.id,
-                user_id: myId,
-                status_type: targetStatus
-              }).then();
-            } else {
-              console.log(`[ShadowTalk] Marking group message ${msg.id} as delivered (live)`);
-              supabase.rpc('append_message_status', {
-                msg_id: msg.id,
-                user_id: myId,
-                status_type: 'delivered'
-              }).then();
-            }
+            // Group Chat Live Ticks - Only mark as delivered
+            console.log(`[ShadowTalk] Marking group message ${msg.id} as delivered (live)`);
+            supabase.rpc('append_message_status', {
+              msg_id: msg.id,
+              user_id: myId,
+              status_type: 'delivered'
+            }).then();
           }
         }
 
@@ -2237,6 +2181,15 @@ export const AppProvider = ({ children }) => {
               }
 
               updatedMessages.sort((a, b) => a.timestamp - b.timestamp);
+
+              // Notify the receiver if they are not actively viewing this chat
+              if (!isViewingThisChat && msg.sender_id !== userRef.current?.id && idx < 0) {
+                const senderProfile = (chat.contact?.id === msg.sender_id) 
+                  ? chat.contact 
+                  : (chat.members?.find(m => m.id === msg.sender_id) || { name: 'Someone' });
+                showToast(`New message from ${senderProfile.name || 'a contact'}`, 'info');
+                playNotificationSound();
+              }
 
               const newChat = {
                 ...chat,
@@ -2464,36 +2417,19 @@ export const AppProvider = ({ children }) => {
           let shouldUpdateDb = false;
           let dbStatus = m.status;
 
-          if (isViewingThisChat) {
-            finalStatus = 'seen';
-            if (settingsRef.current?.readReceipts !== false) {
-              dbStatus = 'seen';
-              shouldUpdateDb = (m.status !== 'seen');
-            } else {
-              if (m.status === 'sent') {
-                dbStatus = 'delivered';
-                shouldUpdateDb = true;
-              }
-            }
-          } else {
-            if (m.status === 'sent') {
-              finalStatus = 'delivered';
-              dbStatus = 'delivered';
-              shouldUpdateDb = true;
-            }
+          // Only ever mark as delivered in the background. 'seen' is handled by markAsRead explicitly.
+          if (m.status === 'sent') {
+            finalStatus = 'delivered';
+            dbStatus = 'delivered';
+            shouldUpdateDb = true;
           }
           
           // Only update if status changes
           if (finalStatus !== m.status) {
-            const finalRead = finalStatus === 'seen';
             const cid = chat.id.toLowerCase();
             if (!statusMap[cid]) statusMap[cid] = { seen: [], delivered: [] };
             
-            if (finalStatus === 'seen' && settingsRef.current?.readReceipts !== false) {
-              statusMap[cid].seen.push(m.id);
-            } else if (finalStatus === 'delivered') {
-              statusMap[cid].delivered.push(m.id);
-            } else if (finalStatus === 'seen' && settingsRef.current?.readReceipts === false && m.status === 'sent') {
+            if (finalStatus === 'delivered') {
               statusMap[cid].delivered.push(m.id);
             }
    
@@ -2566,21 +2502,8 @@ export const AppProvider = ({ children }) => {
           
           // Check if already marked
           const isDelivered = m.deliveredTo && m.deliveredTo.includes(myIdLower);
-          const isSeen = m.seenBy && m.seenBy.includes(myIdLower);
           
-          if (isViewingThisChat && !isSeen) {
-            console.log(`[ShadowTalk] Marking group message ${m.id} as seen`);
-            const targetStatus = (settingsRef.current?.readReceipts !== false) ? 'seen' : 'delivered';
-            if (targetStatus === 'seen' || !isDelivered) {
-              promises.push(
-                supabase.rpc('append_message_status', {
-                  msg_id: m.id,
-                  user_id: myIdLower,
-                  status_type: targetStatus
-                })
-              );
-            }
-          } else if (!isViewingThisChat && !isDelivered && !isSeen) {
+          if (!isDelivered) {
             console.log(`[ShadowTalk] Marking group message ${m.id} as delivered`);
             promises.push(
               supabase.rpc('append_message_status', {
@@ -2632,19 +2555,8 @@ export const AppProvider = ({ children }) => {
           const isFromMe = m.senderId?.toLowerCase() === myIdLower;
           if (isFromMe) return m;
 
-          const isViewingThisChat = activeChatIdRef.current && document.visibilityState === 'visible' && (
-            String(activeChatIdRef.current).toLowerCase() === chat.id.toLowerCase() ||
-            (chat.contact?.id && String(activeChatIdRef.current).toLowerCase() === chat.contact.id.toLowerCase()) ||
-            (chat.contact?.shadowId && String(activeChatIdRef.current).toLowerCase() === chat.contact.shadowId.toLowerCase())
-          );
-
-          if (isViewingThisChat) {
-            const targetStatus = settingsRef.current?.readReceipts !== false ? 'seen' : 'delivered';
-            return { ...m, status: targetStatus, read: targetStatus === 'seen' };
-          } else {
-            if (m.status === 'sent') {
-              return { ...m, status: 'delivered', read: false };
-            }
+          if (m.status === 'sent') {
+            return { ...m, status: 'delivered', read: false };
           }
           return m;
         })
