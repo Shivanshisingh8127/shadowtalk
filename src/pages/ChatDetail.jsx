@@ -1103,10 +1103,10 @@ export default function ChatDetail() {
     if (reactingToMessageId) {
       toggleReaction(id, reactingToMessageId, emoji);
       setReactingToMessageId(null);
+      setShowEmojiPicker(false);
     } else {
       setInputText(prev => prev + emoji);
     }
-    setShowEmojiPicker(false);
   };
 
   const handlePaste = async (e) => {
