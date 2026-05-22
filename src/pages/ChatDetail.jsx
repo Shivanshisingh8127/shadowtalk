@@ -501,8 +501,9 @@ export default function ChatDetail() {
     }
   }, [chats, id]);
 
-  // DB-backed check: Verify allow_member_dm from admin's row for shared groups.
-  // This ensures both sender and receiver see/enforce the restriction even if local state is stale.
+  // DB-backed check: Verify allow_member_dm from admin's authoritative row.
+  // This ensures BOTH sides of a DM see/enforce the restriction symmetrically,
+  // regardless of local state staleness (stale local state is the root cause of asymmetry).
   useEffect(() => {
     if (isGroup || !otherId || !user?.id || isNoteToSelf) {
       setDmRestrictedByGroupId(null);
@@ -511,85 +512,95 @@ export default function ChatDetail() {
 
     let cancelled = false;
     const myIdLow = user.id.toLowerCase();
+    const myShadowIdLow = user.shadowId ? user.shadowId.toLowerCase() : null;
     const otherIdLow = otherId.toLowerCase();
+    const otherShadowIdLow = safeChat.contact?.shadowId ? safeChat.contact.shadowId.toLowerCase() : null;
 
-    // Find any shared groups in local state that have DMs disabled OR enabled
-    const sharedGroupIds = (chats || [])
-      .filter(c => c && c.type === 'group' && (c.members || []).length >= 2)
-      .filter(c => {
-        const members = c.members || [];
-        const myMatch = members.some(m => m && String(m.id).toLowerCase() === myIdLow);
-        const otherMatch = members.some(m => m && String(m.id).toLowerCase() === otherIdLow);
-        return myMatch && otherMatch;
-      })
-      .map(c => c.id.toLowerCase());
+    const matchesId = (id, ...targets) =>
+      targets.some(t => t && String(id).toLowerCase() === t);
 
-    if (sharedGroupIds.length === 0) {
-      setDmRestrictedByGroupId(null);
-      return;
-    }
-
-    // Fetch the authoritative (admin's) DB rows to get the canonical allow_member_dm value
     const fetchCanonicalRestriction = async () => {
       try {
-        // We query ALL rows for these group IDs to find the admin's row
+        // Step 1: Get all group IDs from local state that this user is part of
+        const allLocalGroupIds = (chats || [])
+          .filter(c => c && c.type === 'group')
+          .map(c => c.id.toLowerCase());
+
+        if (allLocalGroupIds.length === 0) {
+          if (!cancelled) setDmRestrictedByGroupId(null);
+          return;
+        }
+
+        // Step 2: Fetch ALL rows for these groups from DB to find admin rows
         const { data: groupRows } = await supabase
           .from('chats')
           .select('owner_id, chat_id, chat_data')
-          .in('chat_id', sharedGroupIds);
+          .in('chat_id', allLocalGroupIds);
 
         if (cancelled || !groupRows) return;
 
         let foundRestrictingGroupId = null;
 
-        for (const sharedGroupId of sharedGroupIds) {
-          const rowsForGroup = groupRows.filter(r => r.chat_id === sharedGroupId);
-          if (rowsForGroup.length === 0) continue;
+        // Group the rows by chat_id
+        const rowsByGroup = {};
+        groupRows.forEach(r => {
+          if (!rowsByGroup[r.chat_id]) rowsByGroup[r.chat_id] = [];
+          rowsByGroup[r.chat_id].push(r);
+        });
 
-          // Find the admin's row (most authoritative)
-          let targetRow = rowsForGroup.find(r => {
+        for (const [sharedGroupId, rows] of Object.entries(rowsByGroup)) {
+          // Prefer the admin's row as it is the authoritative source
+          let authoritative = rows.find(r => {
             const cd = r.chat_data;
-            return cd && String(cd.adminId).toLowerCase() === r.owner_id.toLowerCase();
-          });
-          if (!targetRow) targetRow = rowsForGroup[0];
+            return cd && matchesId(cd.adminId, r.owner_id);
+          }) || rows[0];
 
-          const cd = targetRow.chat_data;
+          const cd = authoritative?.chat_data;
           if (!cd) continue;
 
+          // Must have DMs disabled
           const isDisabled = cd.allow_member_dm === false || cd.allowMemberDMs === false;
           if (!isDisabled) continue;
 
-          // Confirm both users are members and neither is admin
+          // Check that both this user and the other user are members of this group
           const members = cd.members || [];
           const adminId = String(cd.adminId || '').toLowerCase();
 
-          const myMember = members.find(m => m && String(m.id).toLowerCase() === myIdLow);
-          const otherMember = members.find(m => m && String(m.id).toLowerCase() === otherIdLow);
+          const myMember = members.find(m => m &&
+            matchesId(m.id, myIdLow, myShadowIdLow) ||
+            matchesId(m.shadowId, myIdLow, myShadowIdLow)
+          );
+          const otherMember = members.find(m => m &&
+            matchesId(m.id, otherIdLow, otherShadowIdLow) ||
+            matchesId(m.shadowId, otherIdLow, otherShadowIdLow)
+          );
+
           if (!myMember || !otherMember) continue;
 
-          const isMeAdmin = adminId === myIdLow || (myMember && myMember.role === 'admin');
-          const isOtherAdmin = adminId === otherIdLow || (otherMember && otherMember.role === 'admin');
-          if (isMeAdmin || isOtherAdmin) continue;
+          // Skip if either user is an admin (admins are exempt from DM restrictions)
+          const isMeAdmin = matchesId(adminId, myIdLow, myShadowIdLow) ||
+                            (myMember && myMember.role === 'admin');
+          const isOtherAdminInGroup = matchesId(adminId, otherIdLow, otherShadowIdLow) ||
+                                      (otherMember && otherMember.role === 'admin');
+          if (isMeAdmin || isOtherAdminInGroup) continue;
 
           foundRestrictingGroupId = sharedGroupId;
 
-          // Sync the canonical setting back into our local chats state if it was stale
-          setChats(prev => prev.map(c => {
-            if (String(c.id).toLowerCase() === sharedGroupId) {
-              const alreadyCorrect = c.allow_member_dm === false && c.allowMemberDMs === false;
-              if (alreadyCorrect) return c;
-              return { ...c, allow_member_dm: false, allowMemberDMs: false };
-            }
-            return c;
-          }));
+          // Patch local chats state so subsequent renders don't need DB call
+          if (!cancelled) {
+            setChats(prev => prev.map(c => {
+              if (String(c.id).toLowerCase() === sharedGroupId) {
+                if (c.allow_member_dm === false && c.allowMemberDMs === false) return c;
+                return { ...c, allow_member_dm: false, allowMemberDMs: false };
+              }
+              return c;
+            }));
+          }
           break;
         }
 
-        // Also clear stale restriction if DB says DMs are now allowed
-        if (!foundRestrictingGroupId) {
-          setDmRestrictedByGroupId(null);
-        } else {
-          setDmRestrictedByGroupId(foundRestrictingGroupId);
+        if (!cancelled) {
+          setDmRestrictedByGroupId(foundRestrictingGroupId || null);
         }
       } catch (err) {
         console.warn('[ChatDetail] DM restriction DB check failed:', err);
@@ -598,9 +609,9 @@ export default function ChatDetail() {
 
     fetchCanonicalRestriction();
     return () => { cancelled = true; };
-  // Re-run when chats change (e.g. after receiving a group_metadata_update broadcast)
+  // Re-run when the chat partner changes, or when local group settings change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGroup, otherId, user?.id, isNoteToSelf, chats.map(c => c.allow_member_dm + c.allowMemberDMs).join(',')]);
+  }, [isGroup, otherId, user?.id, isNoteToSelf, chats.filter(c => c?.type === 'group').map(c => `${c.id}:${c.allow_member_dm}:${c.allowMemberDMs}`).join('|')]);
 
   const isBlocked = !isGroup && (isBlockedDetail || safeChat.isBlocked || safeChat.chat_data?.isBlocked);
   const isBlockedByOther = !isGroup && (isBlockedByOtherDetail || safeChat.isBlockedByOther || safeChat.chat_data?.isBlockedByOther);

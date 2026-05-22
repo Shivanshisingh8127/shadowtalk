@@ -3591,36 +3591,39 @@ export const AppProvider = ({ children }) => {
 
         // Fallback: If no blocking group found in local state, check DB directly.
         // This catches the case where sender's local state is stale (missed the broadcast).
+        // Uses ALL local group IDs (not just ones where local member matching worked) to avoid
+        // the same ID-format mismatch bug that affects the local-state check above.
         if (!blockingGroup) {
-          const sharedGroupIds = currentChats
-            .filter(c => c && c.type === 'group' && (c.members || []).length >= 2)
-            .filter(c => {
-              const members = c.members || [];
-              const myMatch = members.some(m => m && String(m.id).toLowerCase() === myId);
-              const otherMatch = members.some(m => m && String(m.id).toLowerCase() === otherId);
-              return myMatch && otherMatch;
-            })
+          const allLocalGroupIds = currentChats
+            .filter(c => c && c.type === 'group')
             .map(c => c.id.toLowerCase());
 
-          if (sharedGroupIds.length > 0) {
+          if (allLocalGroupIds.length > 0) {
             try {
               const { data: groupRows } = await supabase
                 .from('chats')
                 .select('owner_id, chat_id, chat_data')
-                .in('chat_id', sharedGroupIds);
+                .in('chat_id', allLocalGroupIds);
 
               if (groupRows && groupRows.length > 0) {
-                for (const sharedGroupId of sharedGroupIds) {
-                  const rowsForGroup = groupRows.filter(r => r.chat_id === sharedGroupId);
-                  if (rowsForGroup.length === 0) continue;
+                // Group rows by chat_id
+                const rowsByGroup = {};
+                groupRows.forEach(r => {
+                  if (!rowsByGroup[r.chat_id]) rowsByGroup[r.chat_id] = [];
+                  rowsByGroup[r.chat_id].push(r);
+                });
 
+                const matchId = (val, ...targets) =>
+                  targets.some(t => t && String(val).toLowerCase() === t);
+
+                for (const [sharedGroupId, rows] of Object.entries(rowsByGroup)) {
                   // Prefer admin's row as authoritative
-                  let authoritative = rowsForGroup.find(r => {
+                  const authoritative = rows.find(r => {
                     const cd = r.chat_data;
-                    return cd && String(cd.adminId).toLowerCase() === r.owner_id.toLowerCase();
-                  }) || rowsForGroup[0];
+                    return cd && matchId(cd.adminId, r.owner_id);
+                  }) || rows[0];
 
-                  const cd = authoritative.chat_data;
+                  const cd = authoritative?.chat_data;
                   if (!cd) continue;
 
                   const isDisabled = cd.allow_member_dm === false || cd.allowMemberDMs === false;
@@ -3628,12 +3631,20 @@ export const AppProvider = ({ children }) => {
 
                   const members = cd.members || [];
                   const adminId = String(cd.adminId || '').toLowerCase();
-                  const myMember = members.find(m => m && String(m.id).toLowerCase() === myId);
-                  const otherMember = members.find(m => m && String(m.id).toLowerCase() === otherId);
+
+                  // Check membership with both ID and shadowId
+                  const myMember = members.find(m => m &&
+                    (matchId(m.id, myId, myShadowId) || matchId(m.shadowId, myId, myShadowId))
+                  );
+                  const otherMember = members.find(m => m &&
+                    (matchId(m.id, otherId, otherShadowId) || matchId(m.shadowId, otherId, otherShadowId))
+                  );
                   if (!myMember || !otherMember) continue;
 
-                  const isMeAdmin = adminId === myId || (myMember && myMember.role === 'admin');
-                  const isOtherAdminDB = adminId === otherId || (otherMember && otherMember.role === 'admin');
+                  const isMeAdmin = matchId(adminId, myId, myShadowId) ||
+                                    (myMember && myMember.role === 'admin');
+                  const isOtherAdminDB = matchId(adminId, otherId, otherShadowId) ||
+                                         (otherMember && otherMember.role === 'admin');
                   if (isMeAdmin || isOtherAdminDB) continue;
 
                   console.warn('[ShadowTalk] DB check: Member DMs disabled in group', sharedGroupId);
