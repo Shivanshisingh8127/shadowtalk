@@ -638,7 +638,7 @@ export default function Chats() {
                         typingUsers[chat.id] && Object.values(typingUsers[chat.id]).some(v => v) ? (
                           <span style={{ color: 'var(--text-primary)', fontWeight: 600, animation: 'pulse 1.5s infinite' }}>typing...</span>
                         ) : (
-                          lastMsg ? (lastMsg.senderId === user?.id ? `You: ${lastMsg.text}` : lastMsg.text) : 'No messages yet'
+                          lastMsg ? (lastMsg.senderId === user?.id ? `You: ${lastMsg.text || (lastMsg.media ? 'Media attachment' : '')}` : (lastMsg.text || (lastMsg.media ? 'Media attachment' : ''))) : 'No messages yet'
                         )
                       )}
                     </span>

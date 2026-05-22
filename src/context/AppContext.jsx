@@ -2467,7 +2467,7 @@ export const AppProvider = ({ children }) => {
                 updatedContent.deleteAt = Date.now() + (m.disappearDuration || 3600000);
               }
               
-              const keyToUse = m.dbChatId || chat.id.toLowerCase();
+              const keyToUse = m.dbChatId || myIdLower;
               const encrypted = {
                 ...updatedContent,
                 text: encrypt(updatedContent.text, keyToUse),
