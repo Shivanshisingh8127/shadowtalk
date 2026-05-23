@@ -17,6 +17,19 @@ const DEFAULT_USER = {
   phrase: ''
 };
 
+const STATUS_ORDER = {
+  'sending': 0,
+  'sent': 1,
+  'delivered': 2,
+  'seen': 3
+};
+
+const canUpdateStatus = (currentStatus, newStatus) => {
+  const currentRank = STATUS_ORDER[currentStatus] || 0;
+  const newRank = STATUS_ORDER[newStatus] || 0;
+  return newRank > currentRank;
+};
+
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
@@ -292,6 +305,28 @@ export const AppProvider = ({ children }) => {
             ...chat,
             messages: (chat.messages || []).map(m =>
               messageIds.includes(m.id) ? { ...m, status: 'seen', read: true } : m
+            )
+          };
+        }
+        return chat;
+      }));
+    });
+
+    socket.on('message_delivered', (data) => {
+      const { messageIds, chatId, receiverId } = data;
+      console.log('[ShadowTalk] Received message_delivered socket event:', data);
+
+      // Update local state to mark messages as delivered (if not already seen)
+      setChats(prev => prev.map(chat => {
+        const cid = chatId.toLowerCase();
+        const isMatch = chat.id.toLowerCase() === cid ||
+                        (chat.contact?.id && chat.contact.id.toLowerCase() === cid) ||
+                        (chat.contact?.shadowId && chat.contact.shadowId.toLowerCase() === cid);
+        if (isMatch) {
+          return {
+            ...chat,
+            messages: (chat.messages || []).map(m =>
+              messageIds.includes(m.id) && m.status !== 'seen' ? { ...m, status: 'delivered', read: false } : m
             )
           };
         }
@@ -2125,6 +2160,15 @@ export const AppProvider = ({ children }) => {
                 } : null
               };
               supabase.from('messages').update({ content: dbContent }).eq('id', msg.id).then().catch(() => {});
+              
+              // Emit delivery receipt to sender via socket
+              socketRef.current?.emit('message_delivered', {
+                messageIds: [msg.id],
+                chatId: msg.chat_id,
+                senderId: msg.sender_id,
+                receiverId: myId
+              });
+              
               supabase.rpc('append_message_status', { msg_id: msg.id, user_id: myId, status_type: 'delivered' }).then().catch(() => {});
 
               // Broadcast delivered status back to the sender

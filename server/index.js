@@ -80,16 +80,17 @@ const userSockets = new Map(); // userId -> socketId
 
 io.on('connection', (socket) => {
   const userId = socket.userId;
-  userSockets.set(userId, socket.id);
+  const userIdLower = String(userId).toLowerCase();
+  userSockets.set(userIdLower, socket.id);
   console.log(`[Signaling] User connected: ${userId} (Socket: ${socket.id})`);
 
   socket.on('disconnect', () => {
-    userSockets.delete(userId);
+    userSockets.delete(userIdLower);
     console.log(`[Signaling] User disconnected: ${userId}`);
     // If user was in a call, notify the other party
     if (socket.currentCall) {
       const { targetId, callId } = socket.currentCall;
-      const targetSocketId = userSockets.get(targetId);
+      const targetSocketId = userSockets.get(String(targetId).toLowerCase());
       if (targetSocketId) {
         io.to(targetSocketId).emit('call-ended', { callId, reason: 'remote-disconnect' });
       }
@@ -100,7 +101,7 @@ io.on('connection', (socket) => {
   // Initiate Call
   socket.on('call-offer', (data) => {
     const { targetId, type, sdp, callerInfo } = data;
-    const targetSocketId = userSockets.get(targetId);
+    const targetSocketId = userSockets.get(String(targetId).toLowerCase());
     
     console.log(`[Signaling] Call offer from ${userId} to ${targetId} (${type})`);
     callStarts.inc({ type });
@@ -124,7 +125,7 @@ io.on('connection', (socket) => {
   // Answer Call
   socket.on('call-answer', (data) => {
     const { targetId, sdp, callId } = data;
-    const targetSocketId = userSockets.get(targetId);
+    const targetSocketId = userSockets.get(String(targetId).toLowerCase());
     
     console.log(`[Signaling] Call answer from ${userId} to ${targetId}`);
 
@@ -144,7 +145,7 @@ io.on('connection', (socket) => {
   // ICE Candidate exchange
   socket.on('ice-candidate', (data) => {
     const { targetId, candidate } = data;
-    const targetSocketId = userSockets.get(targetId);
+    const targetSocketId = userSockets.get(String(targetId).toLowerCase());
     
     if (targetSocketId) {
       io.to(targetSocketId).emit('ice-candidate', { candidate, from: userId });
@@ -154,7 +155,7 @@ io.on('connection', (socket) => {
   // End/Decline Call
   socket.on('end-call', (data) => {
     const { targetId, callId, reason } = data;
-    const targetSocketId = userSockets.get(targetId);
+    const targetSocketId = userSockets.get(String(targetId).toLowerCase());
     
     console.log(`[Signaling] Call ended by ${userId} (Reason: ${reason})`);
 
@@ -174,7 +175,7 @@ io.on('connection', (socket) => {
   // Busy Signal
   socket.on('call-busy', (data) => {
     const { targetId } = data;
-    const targetSocketId = userSockets.get(targetId);
+    const targetSocketId = userSockets.get(String(targetId).toLowerCase());
     if (targetSocketId) {
       io.to(targetSocketId).emit('call-busy', { from: userId });
     }
@@ -214,6 +215,25 @@ io.on('connection', (socket) => {
       }
     } catch (err) {
       console.error('[Signaling] Error in message_seen handler:', err);
+    }
+  });
+
+  // Handle Message Delivered
+  socket.on('message_delivered', (data) => {
+    try {
+      const { messageIds, chatId, senderId, receiverId } = data;
+      if (!messageIds || !chatId || !senderId || !receiverId) return;
+
+      console.log(`[Signaling] message_delivered event from receiver ${receiverId} for sender ${senderId} in chat ${chatId}`);
+
+      // Broadcast to sender's active socket
+      const senderSocketId = userSockets.get(senderId.toLowerCase());
+      if (senderSocketId) {
+        console.log(`[Signaling] Forwarding message_delivered event to sender ${senderId}`);
+        io.to(senderSocketId).emit('message_delivered', { messageIds, chatId, receiverId });
+      }
+    } catch (err) {
+      console.error('[Signaling] Error in message_delivered handler:', err);
     }
   });
 });
