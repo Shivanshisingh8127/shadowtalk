@@ -3713,15 +3713,15 @@ export const AppProvider = ({ children }) => {
     });
 
     // 🔐 Encryption
+    const { deliveryStatus, ...messageToEncrypt } = newMessage;
     const encryptedMsg = {
-      ...newMessage,
+      ...messageToEncrypt,
       text: encrypt(newMessage.text, canonicalId),
       replyTo: newMessage.replyTo ? {
         ...newMessage.replyTo,
         text: encrypt(newMessage.replyTo.text, canonicalId)
       } : null
     };
-
     // 1. Insert for SENDER — chat_id = recipient's ID (single record, no _rec needed)
     supabase.from('messages').insert({
       id: newMessage.id,
