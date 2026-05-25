@@ -2475,7 +2475,9 @@ export default function ChatDetail() {
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     {isMine && (
                       <div style={{ marginLeft: '4px', display: 'flex', alignItems: 'center' }}>
-                        {isGroup ? (
+                        {msg.deliveryStatus === 'sending' ? (
+                          <ClockIcon size={12} color="var(--text-muted)" style={{ opacity: 0.6 }} />
+                        ) : isGroup ? (
                           // Group Chat Ticks
                           (msg.seenBy && msg.seenBy.length >= (safeChat.members?.length || 1) - 1) ? (
                             settings.readReceipts ? (
