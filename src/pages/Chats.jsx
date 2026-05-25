@@ -383,7 +383,7 @@ export default function Chats() {
       )}
 
       {view === 'chats' && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 20px', gap: '8px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px 8px', gap: '10px', marginBottom: '4px' }}>
           {[
             { id: 'all', label: 'All', icon: <MessageSquareIcon size={16} /> },
             { id: 'direct', label: 'Direct', icon: <UserIcon size={16} /> },
@@ -394,14 +394,15 @@ export default function Chats() {
               onClick={() => setFilter(f.id)}
               className={filter === f.id ? '' : 'glass-morphism-light'}
               style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                padding: '10px 0', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 600,
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                padding: '10px 4px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 600,
                 backgroundColor: filter === f.id ? 'var(--accent-primary)' : 'transparent',
                 color: filter === f.id ? '#fff' : 'var(--text-secondary)',
                 border: filter === f.id ? 'none' : '1px solid var(--border-color)', 
                 cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                 boxShadow: filter === f.id ? 'var(--shadow-glow)' : 'none',
-                transform: filter === f.id ? 'scale(1.02)' : 'scale(1)'
+                transform: filter === f.id ? 'scale(1.02)' : 'scale(1)',
+                whiteSpace: 'nowrap'
               }}
             >
               {f.icon}
