@@ -183,54 +183,53 @@ export default function Chats() {
         justifyContent: 'space-between',
         padding: '0 16px', 
         height: '70px', 
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        position: 'relative'
+        borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
         {/* Left: Avatar */}
-        <button 
-          className="icon-btn" 
-          onClick={() => navigate('/settings')}
-          style={{ 
-            padding: 0, 
-            width: '40px', 
-            height: '40px', 
-            borderRadius: '50%', 
-            overflow: 'hidden',
-            border: '2px solid rgba(124, 77, 255, 0.5)',
-            boxShadow: '0 0 15px rgba(124, 77, 255, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.3s ease',
-            flexShrink: 0,
-            zIndex: 1
-          }}
-        >
-          {user?.avatarUrl ? (
-            <img src={user.avatarUrl} alt="Me" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            <DefaultAvatar name={user?.name} size={40} />
-          )}
-        </button>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+          <button 
+            className="icon-btn" 
+            onClick={() => navigate('/settings')}
+            style={{ 
+              padding: 0, 
+              width: '40px', 
+              height: '40px', 
+              borderRadius: '50%', 
+              overflow: 'hidden',
+              border: '2px solid rgba(124, 77, 255, 0.5)',
+              boxShadow: '0 0 15px rgba(124, 77, 255, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.3s ease',
+              flexShrink: 0
+            }}
+          >
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="Me" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <DefaultAvatar name={user?.name} size={40} />
+            )}
+          </button>
+        </div>
 
-        {/* Centre: Title — absolutely centred so it's always in the middle */}
+        {/* Centre: Title */}
         <h1 style={{
-          position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: '1.4rem',
+          fontSize: 'clamp(1.1rem, 5vw, 1.4rem)',
           fontWeight: '800',
           letterSpacing: '-0.5px',
-          margin: 0,
+          margin: '0 8px',
           color: 'var(--text-primary)',
           whiteSpace: 'nowrap',
-          pointerEvents: 'none'
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          textAlign: 'center'
         }}>
           ShadowTalk
         </h1>
 
         {/* Right: Action icons */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, zIndex: 1 }}>
+        <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
           {view === 'chats' ? (
             <>
               <button className="icon-btn glass-morphism-light" onClick={() => setFilter(filter === 'archived' ? 'all' : 'archived')} style={{ position: 'relative', border: 'none', color: filter === 'archived' ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
