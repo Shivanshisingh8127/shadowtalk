@@ -1590,74 +1590,6 @@ export const AppProvider = ({ children }) => {
           return chat;
         }));
       })
-      .on('broadcast', { event: 'status_change' }, (payload) => {
-        const { userId, status, isBlocked } = payload.payload;
-        console.log('[ShadowTalk] Real-time privacy update:', { userId, status, isBlocked });
-
-        setChats(prev => prev.map(chat => {
-          const targetId = userId?.toLowerCase();
-          const targetShadowId = payload.payload.shadowId?.toLowerCase();
-          const isMatch = chat.id?.toLowerCase() === targetId ||
-            chat.contact?.id?.toLowerCase() === targetId ||
-            (targetShadowId && chat.id?.toLowerCase() === targetShadowId) ||
-            (targetShadowId && chat.contact?.id?.toLowerCase() === targetShadowId);
-
-          if (isMatch) {
-            const isBlockedByOther = isBlocked === true;
-            if (isBlockedByOther) {
-              showToast('You have been blocked by this contact', 'error');
-              const currentCall = useCallStore.getState();
-              if (currentCall.isCalling && currentCall.remoteUser?.id?.toLowerCase() === targetId) {
-                endCall();
-              }
-            } else if (isBlocked === false) {
-              showToast('This contact has unblocked you', 'success');
-            }
-
-            if (status === 'pending_received') {
-              showToast('New connection request received!', 'info');
-            }
-
-            const updatedChat = {
-              ...chat,
-              isDeletedByMe: (status === 'pending_received' || status === 'pending_sent') ? false : chat.isDeletedByMe,
-              isDeletedByOther: (status === 'deleted' || status === 'rejected') ? true : (status === 'pending_received' || status === 'pending_sent' ? false : chat.isDeletedByOther),
-              isBlockedByOther: isBlockedByOther,
-              disappearingConfig: payload.payload.disappearingConfig !== undefined ? payload.payload.disappearingConfig : chat.disappearingConfig,
-              status: status === 'rejected' ? 'rejected' :
-                (status === 'connected' ? 'direct' :
-                  (status === 'pending_received' ? 'pending_received' :
-                    (status === 'pending_sent' ? 'pending_sent' : chat.status)))
-            };
-
-            // 🔐 Persist privacy change to DB so it survives refresh
-            lastSyncRef.current = Date.now(); // Set cooldown to prevent race condition with loginMockUser
-            supabase.from('chats')
-              .update({ chat_data: updatedChat })
-              .eq('owner_id', userRef.current?.id?.toLowerCase())
-              .eq('chat_id', chat.id.toLowerCase())
-              .then(({ error }) => {
-                if (error) console.error('[ShadowTalk] Privacy persist error:', error);
-                else console.log('[ShadowTalk] Privacy persist success for:', chat.id, updatedChat.disappearingConfig);
-              });
-
-            return updatedChat;
-          }
-          return chat;
-        }));
-
-        // 🆕 If the chat didn't exist in our list, we MUST add it!
-        const targetId = userId?.toLowerCase();
-        const exists = (chatsRef.current || []).some(chat =>
-          chat.id?.toLowerCase() === targetId ||
-          chat.contact?.id?.toLowerCase() === targetId
-        );
-
-        if (!exists && (status === 'pending_received' || status === 'pending_sent')) {
-          console.log('[ShadowTalk] Adding missing chat from broadcast:', targetId);
-          loginMockUser(userRef.current?.name, userRef.current?.id, userRef.current?.phrase, true);
-        }
-      })
       .on('broadcast', { event: 'CALL_STATUS_UPDATE' }, (payload) => {
         const { messageId, status, text, duration } = payload.payload;
         console.log('[ShadowTalk] Real-time CALL_STATUS_UPDATE received:', messageId, status);
@@ -2232,9 +2164,79 @@ export const AppProvider = ({ children }) => {
     })
     .subscribe();
 
+    const privacySub = supabase.channel(`privacy_${user.id.toLowerCase()}`);
+    privacySub.on('broadcast', { event: 'status_change' }, (payload) => {
+      const { userId, status, isBlocked } = payload.payload;
+      console.log('[ShadowTalk] Real-time privacy update:', { userId, status, isBlocked });
+
+      setChats(prev => prev.map(chat => {
+        const targetId = userId?.toLowerCase();
+        const targetShadowId = payload.payload.shadowId?.toLowerCase();
+        const isMatch = chat.id?.toLowerCase() === targetId ||
+          chat.contact?.id?.toLowerCase() === targetId ||
+          (targetShadowId && chat.id?.toLowerCase() === targetShadowId) ||
+          (targetShadowId && chat.contact?.id?.toLowerCase() === targetShadowId);
+
+        if (isMatch) {
+          const isBlockedByOther = isBlocked === true;
+          if (isBlockedByOther) {
+            showToast('You have been blocked by this contact', 'error');
+            const currentCall = useCallStore.getState();
+            if (currentCall.isCalling && currentCall.remoteUser?.id?.toLowerCase() === targetId) {
+              endCall();
+            }
+          } else if (isBlocked === false) {
+            showToast('This contact has unblocked you', 'success');
+          }
+
+          if (status === 'pending_received') {
+            showToast('New connection request received!', 'info');
+          }
+
+          const updatedChat = {
+            ...chat,
+            isDeletedByMe: (status === 'pending_received' || status === 'pending_sent') ? false : chat.isDeletedByMe,
+            isDeletedByOther: (status === 'deleted' || status === 'rejected') ? true : (status === 'pending_received' || status === 'pending_sent' ? false : chat.isDeletedByOther),
+            isBlockedByOther: isBlockedByOther,
+            disappearingConfig: payload.payload.disappearingConfig !== undefined ? payload.payload.disappearingConfig : chat.disappearingConfig,
+            status: status === 'rejected' ? 'rejected' :
+              (status === 'connected' ? 'direct' :
+                (status === 'pending_received' ? 'pending_received' :
+                  (status === 'pending_sent' ? 'pending_sent' : chat.status)))
+          };
+
+          // 🔐 Persist privacy change to DB so it survives refresh
+          lastSyncRef.current = Date.now(); // Set cooldown to prevent race condition with loginMockUser
+          supabase.from('chats')
+            .update({ chat_data: updatedChat })
+            .eq('owner_id', userRef.current?.id?.toLowerCase())
+            .eq('chat_id', chat.id.toLowerCase())
+            .then(({ error }) => {
+              if (error) console.error('[ShadowTalk] Privacy persist error:', error);
+              else console.log('[ShadowTalk] Privacy persist success for:', chat.id, updatedChat.disappearingConfig);
+            });
+
+          return updatedChat;
+        }
+        return chat;
+      }));
+
+      // 🆕 If the chat didn't exist in our list, we MUST add it!
+      const targetId = userId?.toLowerCase();
+      const exists = (chatsRef.current || []).some(chat =>
+        chat.id?.toLowerCase() === targetId ||
+        chat.contact?.id?.toLowerCase() === targetId
+      );
+
+      if (!exists && (status === 'pending_received' || status === 'pending_sent')) {
+        console.log('[ShadowTalk] Adding missing chat from broadcast:', targetId);
+        loginMockUser(userRef.current?.name, userRef.current?.id, userRef.current?.phrase, true);
+      }
+    }).subscribe();
 
     return () => {
       supabase.removeChannel(chatSub);
+      supabase.removeChannel(privacySub);
     };
   }, [user]);
 
