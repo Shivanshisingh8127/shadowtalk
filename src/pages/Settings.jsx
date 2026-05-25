@@ -580,9 +580,7 @@ export default function Settings() {
 
 
 
-        <div style={{ padding: '20px 20px 8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px' }}>
-          Appearance
-        </div>
+        <div className="section-label">Appearance</div>
         <SettingItem 
           icon={theme === 'dark' ? <MoonIcon size={24} /> : <SunIcon size={24} />} 
           title="Appearance" 
@@ -590,9 +588,7 @@ export default function Settings() {
           onClick={() => navigate('/settings/appearance')}
         />
 
-        <div style={{ padding: '20px 20px 8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px' }}>
-          Account
-        </div>
+        <div className="section-label">Account</div>
         <SettingItem 
           icon={<ShieldIcon size={24} />} 
           title="Privacy" 

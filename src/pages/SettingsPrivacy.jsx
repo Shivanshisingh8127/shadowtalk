@@ -28,9 +28,7 @@ const Toggle = ({ checked, onChange }) => (
 );
 
 const SectionTitle = ({ title }) => (
-  <div style={{ padding: '24px 16px 8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px' }}>
-    {title}
-  </div>
+  <div className="section-label">{title}</div>
 );
 
 const SettingRow = ({ title, description, rightElement, onClick }) => (

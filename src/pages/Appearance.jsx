@@ -146,7 +146,7 @@ export default function Appearance() {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-        <h2 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>Themes</h2>
+        <div className="section-label">Themes</div>
         <div className="glass-box" style={{ borderRadius: '24px', overflow: 'hidden', border: 'none', marginBottom: '32px' }}>
           <ThemeOption 
             name="Classic Dark" 
@@ -174,7 +174,7 @@ export default function Appearance() {
           />
         </div>
 
-        <h2 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>Primary Color</h2>
+        <div className="section-label">Primary Color</div>
         
         {/* Preview Section */}
         <div style={{ 
@@ -268,7 +268,7 @@ export default function Appearance() {
           </label>
         </div>
 
-        <h2 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>Global Wallpaper</h2>
+        <div className="section-label">Global Wallpaper</div>
         
         <input 
           type="file" 
@@ -335,7 +335,7 @@ export default function Appearance() {
           ))}
         </div>
 
-        <h2 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>Auto Dark Mode</h2>
+        <div className="section-label">Auto Dark Mode</div>
         <div 
           onClick={() => setFollowSystem(!followSystem)}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--bg-secondary)', padding: '18px 16px', borderRadius: '16px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
