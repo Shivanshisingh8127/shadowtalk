@@ -392,21 +392,24 @@ export default function Chats() {
           ].map(f => (
             <button key={f.id} 
               onClick={() => setFilter(f.id)}
-              className={filter === f.id ? '' : 'glass-morphism-light'}
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                padding: '10px 4px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 600,
-                backgroundColor: filter === f.id ? 'var(--accent-primary)' : 'transparent',
-                color: filter === f.id ? '#fff' : 'var(--text-secondary)',
-                border: filter === f.id ? 'none' : '1px solid var(--border-color)', 
+                padding: '10px 4px', borderRadius: '16px', fontSize: '0.8rem', fontWeight: 700,
+                backgroundColor: filter === f.id ? 'var(--accent-primary)' : 'rgba(0, 0, 0, 0.55)',
+                color: '#fff',
+                border: filter === f.id ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.2)',
                 cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                boxShadow: filter === f.id ? 'var(--shadow-glow)' : 'none',
-                transform: filter === f.id ? 'scale(1.02)' : 'scale(1)',
-                whiteSpace: 'nowrap'
+                boxShadow: filter === f.id ? 'var(--shadow-glow)' : '0 2px 8px rgba(0,0,0,0.4)',
+                transform: filter === f.id ? 'scale(1.05)' : 'scale(1)',
+                whiteSpace: 'nowrap',
+                textShadow: filter === f.id ? 'none' : '0 1px 4px rgba(0,0,0,0.8)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                letterSpacing: '0.02em'
               }}
             >
               {f.icon}
-              <span>{f.label}</span>
+              <span style={{ fontWeight: 700 }}>{f.label}</span>
             </button>
           ))}
         </div>
