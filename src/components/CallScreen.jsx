@@ -72,29 +72,7 @@ export default function CallScreen() {
 
   const isVideo = false; // Force audio-only mode
 
-  // Ringtone: only for receiver, only when not yet accepted, only when isCalling is true
-  useEffect(() => {
-    if (!isCalling || !callData || callData?.isInitiator || hasAccepted) {
-      // Stop any playing ringtone
-      if (ringtoneRef.current) {
-        ringtoneRef.current.pause();
-        ringtoneRef.current = null;
-      }
-      return;
-    }
-    // Receiver has an incoming call - play ringtone
-    if (!ringtoneRef.current) {
-      ringtoneRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
-      ringtoneRef.current.loop = true;
-      ringtoneRef.current.play().catch(e => console.warn('Ringtone blocked:', e));
-    }
-    return () => {
-      if (ringtoneRef.current) {
-        ringtoneRef.current.pause();
-        ringtoneRef.current = null;
-      }
-    };
-  }, [isCalling, callData, hasAccepted]);
+  
 
   useEffect(() => {
     if (!isCalling || !callData || !user) return;
@@ -179,11 +157,37 @@ export default function CallScreen() {
       }
     };
   }, []); // Handle UI State & Call Timeouts
-  // Handle UI State & Call Timeouts & Tones
+  // Handle UI State & Call Timeouts
   useEffect(() => {
     if (!isCalling || !callData) return;
 
-    // --- Tones Logic ---
+    if (callData.isInitiator) {
+      setHasAccepted(true);
+      setCallStatus('Ringing...');
+      timeoutRef.current = setTimeout(() => {
+        setCallStatus('No Answer');
+        handleEndCall(true, 'timeout');
+      }, 45000);
+    } else {
+      setCallStatus('Incoming Call...');
+      timeoutRef.current = setTimeout(() => {
+        if (!hasAccepted) handleEndCall(true, 'timeout');
+      }, 60000);
+    }
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [isCalling, callData]);
+
+  // Handle Call Tones
+  useEffect(() => {
+    if (!isCalling || !callData) {
+      if (callingToneRef.current) { callingToneRef.current.pause(); callingToneRef.current = null; }
+      if (ringtoneRef.current) { ringtoneRef.current.pause(); ringtoneRef.current = null; }
+      return;
+    }
+
     if (callData.isInitiator) {
       if (callStatus === 'Ringing...' || callStatus === 'Connecting...') {
         if (!callingToneRef.current) {
@@ -211,25 +215,7 @@ export default function CallScreen() {
         }
       }
     }
-
-    if (callData.isInitiator) {
-      setHasAccepted(true);
-      setCallStatus('Ringing...');
-      timeoutRef.current = setTimeout(() => {
-        setCallStatus('No Answer');
-        handleEndCall(true, 'timeout');
-      }, 45000);
-    } else {
-      setCallStatus('Incoming Call...');
-      timeoutRef.current = setTimeout(() => {
-        if (!hasAccepted) handleEndCall(true, 'timeout');
-      }, 60000);
-    }
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [isCalling, callData]);
+  }, [isCalling, callData, callStatus, hasAccepted]);
   // Duration Timer
   useEffect(() => {
     let interval;
