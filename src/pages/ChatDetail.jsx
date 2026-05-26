@@ -1364,7 +1364,7 @@ export default function ChatDetail() {
 
         if (isMounted && chatData?.chat_data) {
           // Sync this group (active or removed) into local state
-          await loginMockUser(user.name, user?.id, user.phrase, true);
+          await loginMockUser(user.name, user?.id, user.recoveryKey, true);
           setIsResolving(false);
           clearTimeout(safetyTimeout);
           return;
@@ -1412,7 +1412,7 @@ export default function ChatDetail() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
             <button 
               className="btn-secondary" 
-              onClick={() => { loginMockUser(user?.name, user?.id, user?.phrase, true); }}
+              onClick={() => { loginMockUser(user?.name, user?.id, user?.recoveryKey, true); }}
               style={{ fontSize: '0.8rem', padding: '10px 20px', backgroundColor: 'rgba(0, 255, 136, 0.1)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)', borderRadius: '12px' }}
             >
               Refresh Connection

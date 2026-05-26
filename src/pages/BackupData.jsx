@@ -23,7 +23,7 @@ export default function BackupData() {
           id: user?.id,
           name: user.name,
           shadowId: user?.shadowId,
-          phrase: user.phrase
+          phrase: user.recoveryKey
         },
         chats: chats,
         settings: settings

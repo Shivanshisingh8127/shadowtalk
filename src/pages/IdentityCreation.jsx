@@ -51,6 +51,7 @@ export default function IdentityCreation() {
 
     setIsSaving(true);
     const finalUsername = username.trim().toLowerCase();
+    const recoveryId = `REC-${generateRandomHex(32)}`;
     try {
       const { error } = await supabase
         .from('users')
@@ -58,7 +59,8 @@ export default function IdentityCreation() {
           id: finalUsername,          // Short alias used as recoverable DB primary key
           name: displayName || username,
           shadow_id: identityId, // The long secure hex ID
-          recovery_key: recoveryPhrase
+          recovery_key: recoveryPhrase,
+          phrase: recoveryId
         }]);
 
       if (error) {

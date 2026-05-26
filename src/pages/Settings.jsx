@@ -24,7 +24,10 @@ import {
   Image as ImageIcon,
   Play as PlayIcon, 
   ArrowLeft as ArrowLeftIcon, 
-  Fingerprint as FingerprintIcon 
+  Fingerprint as FingerprintIcon,
+  Eye as EyeIcon,
+  EyeOff as EyeOffIcon,
+  AlertTriangle as AlertTriangleIcon
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../supabaseClient';
@@ -113,6 +116,7 @@ export default function Settings() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
+  const [showRecoveryId, setShowRecoveryId] = useState(false);
   
   useEffect(() => {
     if (user?.name) setEditName(user.name);
@@ -337,7 +341,7 @@ export default function Settings() {
       }
 
       if (loginMockUser) {
-        await loginMockUser(user.name, targetId, user.phrase, true);
+        await loginMockUser(user.name, targetId, user.recoveryKey, true);
       }
       showToast('Profile picture updated!', 'success');
       
@@ -406,7 +410,7 @@ export default function Settings() {
       localStorage.setItem('shadowtalk_user', JSON.stringify(updatedUser)); // Immediate local persistence
       
       if (loginMockUser) {
-        await loginMockUser(editName, targetId, user.phrase, true);
+        await loginMockUser(editName, targetId, user.recoveryKey, true);
       }
 
       // 5. Broadcast change to contacts
@@ -558,7 +562,7 @@ export default function Settings() {
             gap: '8px', 
             padding: '6px 12px', 
             borderRadius: 'var(--radius-full)',
-            marginBottom: '20px',
+            marginBottom: '10px',
             border: '1px solid rgba(124, 77, 255, 0.3)'
           }}>
             <FingerprintIcon size={14} color="var(--accent-primary)" />
@@ -566,6 +570,28 @@ export default function Settings() {
               {user?.shadowId?.substring(0, 16)}...
             </span>
           </div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '20px' }}>Your public Shadow ID for connecting</div>
+
+          {user?.recoveryId && (
+            <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: 'rgba(255, 68, 68, 0.05)', borderRadius: '16px', border: '1px solid rgba(255, 68, 68, 0.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
+                <KeyIcon size={14} color="var(--accent-danger)" />
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-danger)', letterSpacing: '1px' }}>ACCOUNT RECOVERY ID</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '0.9rem', fontFamily: 'monospace', color: 'var(--text-primary)', letterSpacing: showRecoveryId ? '0px' : '2px' }}>
+                  {showRecoveryId ? user.recoveryId : '••••••••••••••••••••••••••••••••'}
+                </span>
+                <button className="icon-btn" onClick={() => setShowRecoveryId(!showRecoveryId)} style={{ padding: '4px', width: 'auto', height: 'auto', color: 'var(--text-muted)' }}>
+                  {showRecoveryId ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '12px', color: 'var(--text-muted)' }}>
+                <AlertTriangleIcon size={12} color="var(--accent-danger)" />
+                <span style={{ fontSize: '0.65rem' }}>KEEP SECRET. This replaces User ID for recovering your account.</span>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
             <button className="btn-secondary" onClick={handleShareId} style={{ width: 'auto', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>

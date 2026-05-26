@@ -9,7 +9,7 @@ export default function RecoveryPassword() {
   const { user } = useAppContext();
   
   // Real phrase from user context
-  const phrase = user?.phrase || '';
+  const phrase = user?.recoveryKey || '';
   
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);

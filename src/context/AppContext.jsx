@@ -2649,12 +2649,22 @@ export const AppProvider = ({ children }) => {
       const shadowHex = (data?.shadow_id || inputId).toLowerCase();
       console.log('[ShadowTalk] Identified user session:', { shortId, shadowHex });
 
+      const recoveryKey = data?.recovery_key || customPhrase || generateRecoveryPhrase();
+      let recoveryId = data?.phrase;
+      if (!recoveryId) {
+        // Silently generate for existing users to prevent lockouts
+        const generateRandomHex = (len) => [...Array(len)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+        recoveryId = `REC-${generateRandomHex(32)}`;
+        supabase.from('users').update({ phrase: recoveryId }).eq('id', shortId).then();
+      }
+
       setUser({
         id: shortId,         // The actual DB primary key (e.g., 'shivanshi', 'm1')
         shortId: shortId,    // Same — kept for compatibility
         shadowId: shadowHex, // The long hex for display / QR code
         name: data?.name || customName || 'Anonymous User',
-        phrase: data?.recovery_key || customPhrase || generateRecoveryPhrase(),
+        recoveryKey: recoveryKey,
+        recoveryId: recoveryId,
         avatarUrl: data?.avatar_url || null
       });
 

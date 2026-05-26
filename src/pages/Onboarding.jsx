@@ -41,31 +41,31 @@ export default function Onboarding() {
   const handleRecover = async (e) => {
     e.preventDefault();
     if (!recoverIds.userId || !recoverIds.shadowId) {
-      showToast('Both ID and Recovery Key are required', 'error');
+      showToast('Both Recovery ID and Recovery Key are required', 'error');
       return;
     }
     
     setIsVerifying(true);
       try {
-        const searchId = recoverIds.userId.trim().toLowerCase();
+        const searchId = recoverIds.userId.trim();
         const { data, error } = await supabase
           .from('users')
           .select('*')
-          .or(`id.eq."${searchId}",shadow_id.eq."${searchId}"`)
+          .eq('phrase', searchId) // recovery_id is stored in the phrase column
           .maybeSingle();
 
         if (error || !data) {
-          showToast('User not found with this ID', 'error');
+          showToast('Invalid Recovery ID or Key', 'error');
           setIsVerifying(false);
           return;
         }
 
-        // Now verify the recovery key or shadow_id matches
+        // Now verify the recovery key strictly
         const inputKey = recoverIds.shadowId.trim().toLowerCase();
-        const keyMatch = data.recovery_key === inputKey || data.shadow_id === inputKey;
+        const keyMatch = data.recovery_key === inputKey;
 
         if (!keyMatch) {
-          showToast('Invalid Recovery Key or Shadow ID', 'error');
+          showToast('Invalid Recovery ID or Key', 'error');
           setIsVerifying(false);
           return;
         }
@@ -168,11 +168,11 @@ export default function Onboarding() {
 
             <form onSubmit={handleRecover} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'block', fontWeight: 600, letterSpacing: '0.5px' }}>USER ID</label>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'block', fontWeight: 600, letterSpacing: '0.5px' }}>RECOVERY ID</label>
                 <input 
                   type="text" 
                   className="text-input glass-morphism" 
-                  placeholder="Enter your username" 
+                  placeholder="Enter your REC- ID" 
                   value={recoverIds.userId}
                   onChange={e => setRecoverIds({...recoverIds, userId: e.target.value})}
                   required

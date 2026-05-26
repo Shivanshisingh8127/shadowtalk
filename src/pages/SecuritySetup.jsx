@@ -10,7 +10,7 @@ export default function SecuritySetup() {
   const navigate = useNavigate();
 
   const handleCopyPhrase = () => {
-    navigator.clipboard.writeText(user.phrase);
+    navigator.clipboard.writeText(user.recoveryKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -65,7 +65,7 @@ export default function SecuritySetup() {
               gap: '12px',
               marginBottom: '24px'
             }}>
-              {user?.phrase.split(' ').map((word, i) => (
+              {user?.recoveryKey.split(' ').map((word, i) => (
                 <div key={i} style={{
                   backgroundColor: 'var(--bg-tertiary)',
                   padding: '8px',
