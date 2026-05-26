@@ -6,8 +6,30 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { Registry, collectDefaultMetrics, Counter, Gauge } from 'prom-client';
 import { createClient } from '@supabase/supabase-js';
+import admin from 'firebase-admin';
 
 dotenv.config();
+
+// --- Firebase Admin Init ---
+const serviceAccount = {
+  type: "service_account",
+  project_id: "shadowtalk-f916f",
+  private_key_id: "70a894917d2590bbf384b86476abfc7f5837ae2f",
+  private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDOMVM7vmLzoR67\ne8deNzyecy5Rgew+Pr83GYcTPdgOW/XFu2l0j7lR/vFduqzIJsm3fqPHlqjnQemh\nl3eHalGJIK7YMwp9Vq52jKtHW3GSznbyyPOWVWSmQQdb6oDpwBeJqrmo8ZvL9dSc\nJ7/7vsmuRjtc/K+C8048GKzb1TeTcWYwGh3oI3pWbf+kn5UKRzIvnvBhPzmq3OqH\nLEke3tmzbNknJEWt36REFtx9Hz6f6/I2AkXeGJdO0Daip1AfFpx7WRg+kXF7dtop\nAgu0tGDrc35/BcuyEITzv7ISAn290KZ63Hr8NV/RS48D96YTgR6YZkIYMcCAkVFT\nnPlZxNhrAgMBAAECggEAUUAsnVFDqt9lvdlj0aOQlpuqt+Grl0egj/TWPmXTWq0w\nJw/X2V+9VitRL28dIO3v9QfJQCAFRMO7bbrDFjB2GsQvQfCzBHsA2qRJ5h+JnKER\nTFCVdDsII19ip/y7eeEBJXWKHaG/k9q2QiaDx48B6FOylszX2JFJ1fKfQy087jM+\niwRe/YJxmqsdwXDACSwG/o1lnpsbHlO897LbeVjVbOtPaIE51XdJvj9wZKbAG+UA\nx32S3YVw48xMPXoPM25VD7aacOc8MYheofexixnmYm59BNpGm77ruFZXA26vkdQT\nLHbmrdNlXfZWzKW6NaC7r3oo5mq1yCznkfIbS2Oa6QKBgQD78/QFzu0ajP1BEpgv\nfvvYbhmfELnEFeX2rHicQ9MtPiW2J5urG+amaHa7iHckZKeXzSCouFQSocEW24OZ\nMc3efDWMm/IGDlJrzfaws52B/R5xZo+VuyE9O8KMHUtZv4pY2Ex0eYBX2fJXG6wq\nS0FsqWcoZoJtSvq5Y69xDw8DhwKBgQDRgTPnFyVuk2XvZ9g3cKrwVjCwkTw8UiIr\ndhFt8k7digm+Nz9iSbdqd80RPi3UW/LaTPukO/q3wTM/C5rSKaDh8LWC0VNT03ot\nAbJF+J6NrojDHMVcTCaClCxM4tNczwsVbv69rGjtlaFbU4RnmJkixQ6AUP0W7iY2\nuR9uca3E/QKBgF4+GC78AdCGoExw6iAJ/aYtOMQ4+2OPVV95j/vTmvA3aN/D3QSa\nASKJvK/VEcu5Ir8zaV3y5O+7NYCZR5ZL/NeV2mnoAxWk0culVPsvlGEFDxgX5ul4\n/6vp6JGEe6TscpFdBuwibpFt4qoWncWMNMKycvW3sl2zSCmEUiGWImWNAoGAe3/n\ngb1iQnm/aE5V5fCTw9N7JkqnMIPWQrp58c8Z8HyT276jraP47Fks2JJH39xIH6mr\n2ZfF5xaLyAlmPadugGIuDaypq0uJxQgv+BFkHe8aDbJjIVJ+jREdwEEiCZ6/UOY6\nYsNEo3FGShjEf3E0LIvvTXLwjtjaS/366lc28V0CgYEAqblD83WcSsLyZCq/VaJS\nVOIdnIJTbYoEsZbmCFuq7gV4CxeOlFT9hrlXIBZGmr1Ad7Gfdfc7xvuY79eV2401\nau0cu56ATS/oG5pvjJA+iY8K/6ILG64PhBpPhznvJYdovJT9og18IAvtBsoDKxXU\nsKCLlNAPa3xZ7F4i0CC56WY=\n-----END PRIVATE KEY-----\n",
+  client_email: "firebase-adminsdk-fbsvc@shadowtalk-f916f.iam.gserviceaccount.com",
+  client_id: "103593469942695401298",
+  auth_uri: "https://accounts.google.com/o/oauth2/auth",
+  token_uri: "https://oauth2.googleapis.com/token",
+  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+  client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40shadowtalk-f916f.iam.gserviceaccount.com"
+};
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  console.log('[ShadowTalk] Firebase Admin initialized.');
+}
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://uyfcvquwmmvphiezvwvz.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5ZmN2cXV3bW12cGhpZXp2d3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMTE2NTYsImV4cCI6MjA5MjY4NzY1Nn0.TP-ekZJOe4L54kPNU4BespFTpmJZN5mzBBTMBuEJFK4';
@@ -47,6 +69,62 @@ const callStarts = new Counter({
 app.get('/metrics', async (req, res) => {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());
+});
+
+// --- Push Notification Endpoint ---
+// Called by the frontend when a message or call is sent to an offline user
+app.post('/send-push', async (req, res) => {
+  try {
+    const { recipientId, title, body, data } = req.body;
+    if (!recipientId || !title) {
+      return res.status(400).json({ error: 'recipientId and title are required' });
+    }
+
+    // Fetch the recipient's FCM token from the chats table
+    const { data: tokenRow, error: tokenErr } = await supabase
+      .from('chats')
+      .select('chat_data')
+      .eq('owner_id', recipientId.toLowerCase())
+      .eq('chat_id', 'fcm_token')
+      .maybeSingle();
+
+    if (tokenErr || !tokenRow?.chat_data?.token) {
+      console.warn(`[Push] No FCM token for user ${recipientId}`);
+      return res.status(200).json({ sent: false, reason: 'no_token' });
+    }
+
+    const fcmToken = tokenRow.chat_data.token;
+
+    const message = {
+      token: fcmToken,
+      notification: {
+        title: title,
+        body: body || 'You have a new notification'
+      },
+      data: data ? Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])) : {},
+      android: {
+        priority: 'high',
+        notification: {
+          sound: 'default',
+          channelId: 'shadowtalk_notifications'
+        }
+      },
+      webpush: {
+        notification: {
+          icon: '/icon-192.png',
+          badge: '/icon-192.png'
+        },
+        headers: { Urgency: 'high' }
+      }
+    };
+
+    const response = await admin.messaging().send(message);
+    console.log(`[Push] Notification sent to ${recipientId}: ${response}`);
+    return res.status(200).json({ sent: true, messageId: response });
+  } catch (err) {
+    console.error('[Push] Error sending notification:', err);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // --- Authentication Middleware ---

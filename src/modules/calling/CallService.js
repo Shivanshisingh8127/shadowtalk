@@ -1,6 +1,7 @@
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import { supabase } from '../../supabaseClient';
 import { useCallStore } from './store';
+import { sendPushNotification } from '../../utils/pushNotification';
 
 class CallService {
   constructor() {
@@ -309,6 +310,14 @@ class CallService {
         avatarUrl: user?.avatarUrl
       }
     });
+
+    // Push notification for offline receiver
+    sendPushNotification(
+      targetId,
+      `📞 Incoming ${type === 'video' ? 'Video' : 'Audio'} Call`,
+      `${user?.name || 'Someone'} is calling you`,
+      { type: 'call', callType: type, callerId: myId }
+    );
 
     // Auto-timeout if no answer (increased to 40 sec)
     if (this.callTimeout) clearTimeout(this.callTimeout);

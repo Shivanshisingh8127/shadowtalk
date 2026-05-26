@@ -5,6 +5,7 @@ import { callService } from '../modules/calling/CallService';
 import { useCallStore } from '../modules/calling/store';
 import { shareContent } from '../utils/shareHelper';
 import io from 'socket.io-client';
+import { sendPushNotification } from '../utils/pushNotification';
 
 const AppContext = createContext();
 
@@ -960,6 +961,18 @@ export const AppProvider = ({ children }) => {
               if (currentToken) {
                 console.log('[ShadowTalk] FCM Token:', currentToken);
                 localStorage.setItem('shadowtalk_fcm_token', currentToken);
+                // Save to Supabase so the signaling server can send push notifications
+                const pushUserId = userRef?.current?.id || user?.id;
+                if (pushUserId) {
+                  supabase.from('chats').upsert({
+                    owner_id: pushUserId.toLowerCase(),
+                    chat_id: 'fcm_token',
+                    chat_data: { token: currentToken, updatedAt: Date.now() }
+                  }, { onConflict: 'owner_id, chat_id' }).then(({ error: tokenErr }) => {
+                    if (tokenErr) console.error('[ShadowTalk] FCM token DB save error:', tokenErr);
+                    else console.log('[ShadowTalk] FCM token saved to DB for user:', pushUserId);
+                  });
+                }
               } else {
                 console.log('[ShadowTalk] No registration token available.');
               }
@@ -3794,6 +3807,20 @@ export const AppProvider = ({ children }) => {
     })
     .then((dbMsg) => {
       if (!dbMsg) return; // Skip metadata update if insert failed
+
+      // Fire push notification for offline recipient (non-blocking)
+      if (!isGroup && canonicalId !== user.id.toLowerCase()) {
+        const senderName = user.name || 'Someone';
+        const pushTitle = senderName;
+        const pushBody = text
+          ? (text.length > 60 ? text.substring(0, 57) + '...' : text)
+          : (media ? '📎 Sent an attachment' : 'New message');
+        sendPushNotification(canonicalId, pushTitle, pushBody, {
+          type: 'message',
+          senderId: user.id,
+          chatId: canonicalId
+        });
+      }
 
       // 2. Persist Metadata (LIGHT BLOB)
       const chatMetadata = { ...targetChat, messages: [] };
