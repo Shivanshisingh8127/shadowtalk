@@ -513,7 +513,9 @@ export default function Chats() {
             const isBlockedByOther = !isGroup && (chat.isBlockedByOther || chat.chat_data?.isBlockedByOther || chat.is_blocked_by_other);
             const isNoteToSelf = !isGroup && (chat.isSelf === true || chat.id.toLowerCase() === (user?.id || '').toLowerCase());
             let name = isNoteToSelf ? 'Note to Self' : (isGroup ? chat.name : (chat.contact?.nickname || chat.contact?.name || 'Unknown User'));
-            const lastMsg = (chat.messages || [])[(chat.messages?.length || 0) - 1];
+            const internalSystemTypes = ['profile_sync', 'member_left', 'member_added', 'member_removed', 'member_promoted', 'member_demoted'];
+            const visibleMsgs = (chat.messages || []).filter(m => !internalSystemTypes.includes(m.type));
+            const lastMsg = visibleMsgs[visibleMsgs.length - 1];
             const isPendingReceived = chat.status === 'pending_received';
             const isPendingSent = chat.status === 'pending_sent';
             const isMuted = chat.notificationType?.startsWith('Mute') || (chat.muteUntil && chat.muteUntil > Date.now());
