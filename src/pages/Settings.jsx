@@ -130,6 +130,7 @@ export default function Settings() {
   const [isUploadingPic, setIsUploadingPic] = useState(false);
 
   const [copied, setCopied] = useState(false);
+  const [recoveryCopied, setRecoveryCopied] = useState(false);
   const avatarInputRef = useRef(null);
 
   const [isScannerRunning, setIsScannerRunning] = useState(false);
@@ -437,6 +438,14 @@ export default function Settings() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleCopyRecoveryId = () => {
+    if (user?.recoveryId) {
+      navigator.clipboard.writeText(user.recoveryId);
+      setRecoveryCopied(true);
+      setTimeout(() => setRecoveryCopied(false), 2000);
+    }
+  };
+
   const handleShareId = () => {
     inviteFriend();
   };
@@ -594,6 +603,9 @@ export default function Settings() {
                 </span>
                 <button className="icon-btn" onClick={() => setShowRecoveryId(!showRecoveryId)} style={{ padding: '4px', width: 'auto', height: 'auto', color: 'var(--text-muted)' }}>
                   {showRecoveryId ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                </button>
+                <button className="icon-btn" onClick={handleCopyRecoveryId} style={{ padding: '4px', width: 'auto', height: 'auto', color: 'var(--text-muted)', marginLeft: '4px' }}>
+                  {recoveryCopied ? <CheckIcon size={16} color="var(--accent-primary)" /> : <CopyIcon size={16} />}
                 </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '12px', color: 'var(--text-muted)' }}>
