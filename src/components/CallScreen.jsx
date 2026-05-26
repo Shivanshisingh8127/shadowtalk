@@ -191,7 +191,7 @@ export default function CallScreen() {
     if (callData.isInitiator) {
       if (callStatus === 'Ringing...' || callStatus === 'Connecting...') {
         if (!callingToneRef.current) {
-          callingToneRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
+          callingToneRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1358/1358-preview.mp3');
           callingToneRef.current.loop = true;
           callingToneRef.current.play().catch(() => {});
         }
@@ -204,7 +204,7 @@ export default function CallScreen() {
     } else {
       if (!hasAccepted && callStatus === 'Incoming Call...') {
         if (!ringtoneRef.current) {
-          ringtoneRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1358/1358-preview.mp3');
+          ringtoneRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
           ringtoneRef.current.loop = true;
           ringtoneRef.current.play().catch(() => {});
         }
