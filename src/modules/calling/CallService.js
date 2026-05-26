@@ -661,6 +661,8 @@ class CallService {
         errorMsg = 'Microphone blocked! Please allow microphone access in your browser settings and refresh.';
       } else if (String(e).includes('101') || String(e).includes('dynamic')) {
         errorMsg = 'Agora Auth Error: New project requires "App ID only" mode.';
+      } else if (String(e).includes('NotReadableError') || String(e).includes('NOT_READABLE')) {
+        errorMsg = 'Microphone is already in use by another app (like Google Meet/Zoom). Please close it and try again.';
       }
 
       window.showToast(errorMsg, 'error', 6000);
