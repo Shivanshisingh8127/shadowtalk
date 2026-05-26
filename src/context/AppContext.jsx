@@ -5791,7 +5791,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const inviteFriend = async () => {
-    const appUrl = 'https://shadowtalk.app'; // Placeholder
+    const appUrl = 'https://shadowtalk-os4t.onrender.com/'; // Placeholder
     const inviteMessage = `🚀 Have you tried ShadowTalk yet?\n\nIt's the ultimate anonymous messaging app with zero data tracking. No phone, no email, just pure privacy.\n\nDownload it here: ${appUrl}\n\nLet's chat securely! 🔒✨`;
 
     const res = await shareContent({
