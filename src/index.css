@@ -41,13 +41,17 @@
 
 /* Light theme is overridden to force dark mode aesthetic if toggled by mistake, ensuring consistency for this specific brand */
 [data-theme='light'] {
-  --bg-primary: #06070A;
-  --bg-secondary: #0F1115;
-  --bg-tertiary: #1A1C23;
-  --text-primary: #FFFFFF;
-  --text-secondary: #B0B3B8;
+  --bg-primary: #F2F4F8;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #E8EBF0;
+  --bg-glass: rgba(255, 255, 255, 0.7);
+  --bg-glass-light: rgba(255, 255, 255, 0.5);
+  --text-primary: #111827;
+  --text-secondary: #374151;
   --text-muted: #6B7280;
-  --border-color: rgba(255, 255, 255, 0.06);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-glow: rgba(124, 77, 255, 0.2);
+  --shadow-soft: 0 10px 40px rgba(0, 0, 0, 0.12);
 }
 
 * {
@@ -250,12 +254,13 @@ input, textarea {
 }
 
 .chat-list-item, .setting-item, .settings-item, .glass-box {
-  background: color-mix(in srgb, var(--accent-primary) 12%, rgba(15, 17, 21, 0.85));
+  background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-secondary));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
   transition: all var(--transition-normal);
+  color: var(--text-primary);
 }
 
 .hoverable {
@@ -263,10 +268,10 @@ input, textarea {
 }
 
 .chat-list-item:hover, .setting-item:hover, .settings-item:hover, .glass-box.hoverable:hover {
-  background: color-mix(in srgb, var(--accent-primary) 25%, rgba(15, 17, 21, 0.85)) !important;
+  background: color-mix(in srgb, var(--accent-primary) 22%, var(--bg-secondary)) !important;
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-soft);
 }
 
 .chat-list-item:hover *, .setting-item:hover *, .settings-item.hoverable:hover *, .glass-box.hoverable:hover * {
@@ -316,7 +321,7 @@ input, textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: color-mix(in srgb, var(--accent-primary) 5%, rgba(15, 17, 21, 0.7));
+  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-glass));
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-bottom: 1px solid var(--border-color);
@@ -324,6 +329,7 @@ input, textarea {
   min-height: 70px;
   position: sticky;
   top: 0;
+  color: var(--text-primary);
 }
 
 .icon-btn {
@@ -378,5 +384,26 @@ input, textarea {
 .message-vanishing {
   animation: vanish 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
+
+/* Section Labels - Always Visible Over Any Wallpaper/Theme */
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  margin: 20px 16px 8px;
+  padding: 5px 14px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 
 

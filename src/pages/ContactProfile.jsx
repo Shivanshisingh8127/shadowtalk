@@ -472,9 +472,9 @@ export default function ContactProfile() {
           <button className="icon-btn" onClick={() => setActiveView('main')} style={{ position: 'absolute', left: '20px', color: '#fff' }}>
             <ArrowLeftIcon size={24} />
           </button>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ fontSize: '1.2rem', fontWeight: 700 }}>Disappearing Messages</span>
-            <span style={{ fontSize: '0.75rem', color: '#aaa', textAlign: 'center', maxWidth: '250px', marginTop: '4px', lineHeight: '1.4' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textShadow: '0 2px 10px rgba(0,0,0,0.9), 0 1px 3px rgba(0,0,0,0.8)' }}>
+            <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff' }}>Disappearing Messages</span>
+            <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.9)', textAlign: 'center', maxWidth: '280px', marginTop: '6px', lineHeight: '1.4', fontWeight: 600 }}>
               This setting applies to messages you send in this conversation.
             </span>
           </div>
@@ -483,7 +483,7 @@ export default function ContactProfile() {
         <div style={{ padding: '0 20px 20px 20px', display: 'flex', flexDirection: 'column', gap: '24px', flex: 1, overflowY: 'auto' }}>
           
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ color: '#aaa', fontSize: '0.85rem', marginBottom: '8px', marginLeft: '4px' }}>Delete Type</span>
+            <div className="section-label" style={{ margin: '0 0 12px 0' }}>Delete Type</div>
             <div className="glass-box" style={{ padding: 0, borderRadius: '16px', overflow: 'hidden', border: 'none' }}>
               {[
                 { id: 'Off', label: 'Off', sub: null },
@@ -1033,7 +1033,7 @@ export default function ContactProfile() {
         </div>
 
         <div style={{ padding: '0 20px 20px', flex: 1, overflowY: 'auto' }}>
-          <h3 style={{ fontSize: '1rem', color: 'var(--text-muted)', marginBottom: '16px' }}>{chat.members.length} Members</h3>
+          <div className="section-label" style={{ margin: '0 0 16px 0' }}>{chat.members.length} Members</div>
           <div className="settings-section" style={{ padding: 0 }}>
             {(chat.members || [])
               .filter(m => m && m.id)

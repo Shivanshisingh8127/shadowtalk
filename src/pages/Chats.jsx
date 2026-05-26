@@ -183,10 +183,10 @@ export default function Chats() {
         justifyContent: 'space-between',
         padding: '0 16px', 
         height: '70px', 
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        position: 'relative'
+        borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+        {/* Left: Avatar */}
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
           <button 
             className="icon-btn" 
             onClick={() => navigate('/settings')}
@@ -211,20 +211,25 @@ export default function Chats() {
               <DefaultAvatar name={user?.name} size={40} />
             )}
           </button>
-          <h1 style={{
-            fontSize: '1.4rem',
-            fontWeight: '800',
-            letterSpacing: '-0.5px',
-            margin: 0,
-            color: 'var(--text-primary)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>
-            ShadowTalk
-          </h1>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+
+        {/* Centre: Title */}
+        <h1 style={{
+          fontSize: 'clamp(1.1rem, 5vw, 1.4rem)',
+          fontWeight: '800',
+          letterSpacing: '-0.5px',
+          margin: '0 8px',
+          color: 'var(--text-primary)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          textAlign: 'center'
+        }}>
+          ShadowTalk
+        </h1>
+
+        {/* Right: Action icons */}
+        <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
           {view === 'chats' ? (
             <>
               <button className="icon-btn glass-morphism-light" onClick={() => setFilter(filter === 'archived' ? 'all' : 'archived')} style={{ position: 'relative', border: 'none', color: filter === 'archived' ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
@@ -383,7 +388,7 @@ export default function Chats() {
       )}
 
       {view === 'chats' && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 20px', gap: '8px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px 8px', gap: '10px', marginBottom: '4px' }}>
           {[
             { id: 'all', label: 'All', icon: <MessageSquareIcon size={16} /> },
             { id: 'direct', label: 'Direct', icon: <UserIcon size={16} /> },
@@ -392,20 +397,24 @@ export default function Chats() {
           ].map(f => (
             <button key={f.id} 
               onClick={() => setFilter(f.id)}
-              className={filter === f.id ? '' : 'glass-morphism-light'}
               style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                padding: '10px 0', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 600,
-                backgroundColor: filter === f.id ? 'var(--accent-primary)' : 'transparent',
-                color: filter === f.id ? '#fff' : 'var(--text-secondary)',
-                border: filter === f.id ? 'none' : '1px solid var(--border-color)', 
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                padding: '10px 4px', borderRadius: '16px', fontSize: '0.8rem', fontWeight: 700,
+                backgroundColor: filter === f.id ? 'var(--accent-primary)' : 'rgba(0, 0, 0, 0.55)',
+                color: '#fff',
+                border: filter === f.id ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.2)',
                 cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                boxShadow: filter === f.id ? 'var(--shadow-glow)' : 'none',
-                transform: filter === f.id ? 'scale(1.02)' : 'scale(1)'
+                boxShadow: filter === f.id ? 'var(--shadow-glow)' : '0 2px 8px rgba(0,0,0,0.4)',
+                transform: filter === f.id ? 'scale(1.05)' : 'scale(1)',
+                whiteSpace: 'nowrap',
+                textShadow: filter === f.id ? 'none' : '0 1px 4px rgba(0,0,0,0.8)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                letterSpacing: '0.02em'
               }}
             >
               {f.icon}
-              <span>{f.label}</span>
+              <span style={{ fontWeight: 700 }}>{f.label}</span>
             </button>
           ))}
         </div>
