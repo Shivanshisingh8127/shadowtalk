@@ -17,8 +17,8 @@ export default function RecoveryPassword() {
   const [showHideConfirm, setShowHideConfirm] = useState(false);
 
   const handleCopy = () => {
-    if (!user?.shadowId) return;
-    navigator.clipboard.writeText(user?.shadowId);
+    if (!phrase) return;
+    navigator.clipboard.writeText(phrase);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -78,15 +78,16 @@ export default function RecoveryPassword() {
                 <p style={{ 
                   color: 'var(--accent-primary)', 
                   fontFamily: 'monospace', 
-                  fontSize: '0.95rem', 
+                  fontSize: '1.2rem', 
                   lineHeight: '1.6',
                   margin: 0,
                   wordSpacing: '4px',
                   userSelect: 'all',
-                  wordBreak: 'break-all',
-                  overflowWrap: 'anywhere'
+                  wordBreak: 'normal',
+                  overflowWrap: 'break-word',
+                  textAlign: 'center'
                 }}>
-                  {user?.shadowId || 'Shadow ID not found'}
+                  {phrase || 'Recovery Key not found'}
                 </p>
               </div>
 
@@ -180,7 +181,7 @@ export default function RecoveryPassword() {
           }} onClick={e => e.stopPropagation()}>
             <h2 style={{ fontSize: '1.2rem', marginBottom: '24px' }}>Recovery QR</h2>
             <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '12px', display: 'inline-block' }}>
-              <QRCodeCanvas value={user?.shadowId || ''} size={200} />
+              <QRCodeCanvas value={phrase || ''} size={200} />
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '24px' }}>
               Scan to securely transfer your identity backup key.
