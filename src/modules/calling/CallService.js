@@ -160,6 +160,23 @@ class CallService {
       });
     }
 
+    // Show Android drawer notification when app is in background
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+      const callIcon = callType === 'video' ? '📹' : '📞';
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.showNotification(`${callIcon} Incoming ${callType === 'video' ? 'Video' : 'Audio'} Call`, {
+            body: `${callerInfo?.name || 'Someone'} is calling you`,
+            icon: '/icon-192.png',
+            badge: '/icon-192.png',
+            tag: 'incoming-call',
+            renotify: true,
+            requireInteraction: true
+          });
+        }).catch(() => {});
+      }
+    }
+
     useCallStore.getState().receiveCall(callerInfo, channelName);
     
     // NOTE: Receiver does NOT create a message record. 

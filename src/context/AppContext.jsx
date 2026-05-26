@@ -2164,6 +2164,25 @@ export const AppProvider = ({ children }) => {
                   : (chat.members?.find(m => m.id === msg.sender_id) || { name: 'Someone' });
                 showToast(`New message from ${senderProfile.name || 'a contact'}`, 'info');
                 playNotificationSound();
+
+                // Show Android drawer notification when app is in background / tab not visible
+                if (Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+                  const notifTitle = senderProfile.name || 'New Message';
+                  const msgText = decryptedMsg.text || (decryptedMsg.media ? '📎 Sent an attachment' : 'New message');
+                  const notifBody = msgText.length > 80 ? msgText.substring(0, 77) + '...' : msgText;
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(registration => {
+                      registration.showNotification(notifTitle, {
+                        body: notifBody,
+                        icon: '/icon-192.png',
+                        badge: '/icon-192.png',
+                        tag: `msg-${chat.id}`,
+                        renotify: true,
+                        silent: true
+                      });
+                    }).catch(() => {});
+                  }
+                }
               }
 
               const newChat = {
