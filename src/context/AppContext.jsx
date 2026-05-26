@@ -15,7 +15,7 @@ export const useAppContext = () => useContext(AppContext);
 const DEFAULT_USER = {
   id: '',
   name: '',
-  phrase: ''
+  recoveryKey: ''
 };
 
 export const AppProvider = ({ children }) => {
@@ -808,7 +808,7 @@ export const AppProvider = ({ children }) => {
             if (cachedChats) {
               setChats(JSON.parse(cachedChats));
             }
-            await loginMockUser(u.name, u.id, u.phrase);
+            await loginMockUser(u.name, u.id, u.recoveryKey || u.phrase);
           }
         }
       } catch (err) {
@@ -1107,19 +1107,19 @@ export const AppProvider = ({ children }) => {
           String(c.id).toLowerCase().trim() !== String(payload.old.chat_id).toLowerCase().trim()
         ));
       } else {
-        loginMockUser(user.name, user.id, user.phrase, true);
+        loginMockUser(user.name, user.id, user.recoveryKey, true);
       }
     });
 
     chatSub.on('postgres_changes', {
       event: '*', schema: 'public', table: 'requests',
       filter: `receiver_id=eq.${subId1}`
-    }, () => loginMockUser(user.name, user.id, user.phrase, true));
+    }, () => loginMockUser(user.name, user.id, user.recoveryKey, true));
 
     chatSub.on('postgres_changes', {
       event: '*', schema: 'public', table: 'requests',
       filter: `sender_id=eq.${subId1}`
-    }, () => loginMockUser(user.name, user.id, user.phrase, true));
+    }, () => loginMockUser(user.name, user.id, user.recoveryKey, true));
 
     // Subscribe for Shadow ID if different
     if (subId2) {
@@ -1128,18 +1128,18 @@ export const AppProvider = ({ children }) => {
         filter: `owner_id=eq.${subId2}`
       }, (payload) => {
         console.log('[ShadowTalk] New chat detected (ID2):', payload.new?.chat_id);
-        loginMockUser(user.name, user.id, user.phrase, false);
+        loginMockUser(user.name, user.id, user.recoveryKey, false);
       });
 
       chatSub.on('postgres_changes', {
         event: '*', schema: 'public', table: 'requests',
         filter: `receiver_id=eq.${subId2}`
-      }, () => loginMockUser(user.name, user.id, user.phrase, true));
+      }, () => loginMockUser(user.name, user.id, user.recoveryKey, true));
 
       chatSub.on('postgres_changes', {
         event: '*', schema: 'public', table: 'requests',
         filter: `sender_id=eq.${subId2}`
-      }, () => loginMockUser(user.name, user.id, user.phrase, true));
+      }, () => loginMockUser(user.name, user.id, user.recoveryKey, true));
     }
 
     // 4. Listen to updates on my sent messages (so I get real-time delivery double-ticks)
@@ -1773,7 +1773,7 @@ export const AppProvider = ({ children }) => {
             const now = Date.now();
             if (!lastSyncRef.current || now - lastSyncRef.current > 10000) {
               lastSyncRef.current = now;
-              loginMockUser(userRef.current?.name, userRef.current?.id, userRef.current?.phrase, true); // 🚀 SILENT: Discovery refresh
+              loginMockUser(userRef.current?.name, userRef.current?.id, userRef.current?.recoveryKey, true); // 🚀 SILENT: Discovery refresh
             }
             return;
           }
@@ -2257,7 +2257,7 @@ export const AppProvider = ({ children }) => {
 
       if (!exists && (status === 'pending_received' || status === 'pending_sent')) {
         console.log('[ShadowTalk] Adding missing chat from broadcast:', targetId);
-        loginMockUser(userRef.current?.name, userRef.current?.id, userRef.current?.phrase, true);
+        loginMockUser(userRef.current?.name, userRef.current?.id, userRef.current?.recoveryKey, true);
       }
     }).subscribe();
 
@@ -2273,7 +2273,7 @@ export const AppProvider = ({ children }) => {
 
     const interval = setInterval(() => {
       if (userRef.current && navigator.onLine) {
-        loginMockUser(userRef.current.name, userRef.current.id, userRef.current.phrase, true);
+        loginMockUser(userRef.current.name, userRef.current.id, userRef.current.recoveryKey, true);
       }
     }, 30000); // Check every 30 seconds instead of 5s
 
@@ -3117,7 +3117,7 @@ export const AppProvider = ({ children }) => {
           shortId: inputId,
           shadowId: inputId,
           name: customName || 'Anonymous User',
-          phrase: customPhrase || generateRecoveryPhrase()
+          recoveryKey: customPhrase || generateRecoveryPhrase()
         });
         setChats([]);
         setRequests([]);
@@ -3274,7 +3274,7 @@ export const AppProvider = ({ children }) => {
         return chat;
       }));
 
-      loginMockUser(user.name, user.id, user.phrase); // Deep refresh
+      loginMockUser(user.name, user.id, user.recoveryKey); // Deep refresh
       showToast(`Connected with ${request.senderName || 'user'}!`, 'success');
     } catch (err) {
       console.error('Action failed:', err);
