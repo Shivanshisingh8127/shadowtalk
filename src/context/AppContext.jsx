@@ -736,20 +736,27 @@ export const AppProvider = ({ children }) => {
   const playNotificationSound = () => {
     try {
       const context = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = context.createOscillator();
-      const gainNode = context.createGain();
+      
+      const playTone = (freq, startTime, duration, vol) => {
+        const osc = context.createOscillator();
+        const gain = context.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        osc.connect(gain);
+        gain.connect(context.destination);
+        
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(vol, startTime + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
 
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(880, context.currentTime);
-      oscillator.connect(gainNode);
-      gainNode.connect(context.destination);
-
-      gainNode.gain.setValueAtTime(0, context.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.5, context.currentTime + 0.05);
-      gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.3);
-
-      oscillator.start(context.currentTime);
-      oscillator.stop(context.currentTime + 0.3);
+      const now = context.currentTime;
+      playTone(987.77, now, 0.4, 1.0);       // B5 note
+      playTone(1318.51, now + 0.15, 0.8, 1.0); // E6 note (higher, longer)
+      
     } catch (e) {
       console.warn('[ShadowTalk] Failed to play sound:', e);
     }
