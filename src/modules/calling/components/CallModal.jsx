@@ -37,7 +37,7 @@ export default function CallModal() {
   React.useEffect(() => {
     if (isCalling && callStatus === 'ringing') {
       const url = isInitiator 
-        ? 'https://assets.mixkit.co/active_storage/sfx/1358/1358-preview.mp3'
+        ? 'https://assets.mixkit.co/active_storage/sfx/1354/1354-preview.mp3'
         : 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3';
       
       ringtoneRef.current = new Audio(url);

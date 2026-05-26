@@ -191,7 +191,7 @@ export default function CallScreen() {
     if (callData.isInitiator) {
       if (callStatus === 'Ringing...' || callStatus === 'Connecting...') {
         if (!callingToneRef.current) {
-          callingToneRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1358/1358-preview.mp3');
+          callingToneRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1354/1354-preview.mp3');
           callingToneRef.current.loop = true;
           callingToneRef.current.play().catch(() => {});
         }
