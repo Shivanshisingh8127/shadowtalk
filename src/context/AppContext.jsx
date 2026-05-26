@@ -733,9 +733,16 @@ export const AppProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
+  // Global AudioContext so background tabs don't suspend newly created contexts
   const playNotificationSound = () => {
     try {
-      const context = new (window.AudioContext || window.webkitAudioContext)();
+      if (!window.globalAudioContext) {
+        window.globalAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const context = window.globalAudioContext;
+      if (context.state === 'suspended') {
+        context.resume().catch(() => {});
+      }
       
       const playTone = (freq, startTime, duration, vol) => {
         const osc = context.createOscillator();
