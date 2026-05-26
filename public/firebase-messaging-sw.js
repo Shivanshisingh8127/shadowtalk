@@ -189,16 +189,20 @@ async function sweepPendingMessages(userId) {
 
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  const notificationTitle = payload.notification?.title || 'New Message';
+  
+  // If the payload already has a notification, FCM SDK handles it automatically.
+  // We only show it manually if it's a data-only payload to prevent duplicates,
+  // OR if we explicitly want to show it.
+  const notificationTitle = payload.notification?.title || payload.data?.title || 'New Message';
   const notificationOptions = {
-    body: payload.notification?.body || 'You received a new message.',
-    icon: '/favicon.svg'
+    body: payload.notification?.body || payload.data?.body || 'You received a new message.',
+    icon: '/icon-192.png'
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  const notificationPromise = self.registration.showNotification(notificationTitle, notificationOptions);
 
   // Background delivery sync
-  getUserIdFromCache().then((userId) => {
+  const syncPromise = getUserIdFromCache().then((userId) => {
     if (userId) {
       // 1. If payload contains a specific message ID, update it
       const msgId = payload.data?.messageId || payload.data?.id;
@@ -206,7 +210,7 @@ messaging.onBackgroundMessage((payload) => {
         markMessageAsDelivered(msgId, userId);
       }
       // 2. Run a general sweep to catch any other pending messages
-      sweepPendingMessages(userId);
+      return sweepPendingMessages(userId);
     }
   });
 
@@ -219,4 +223,7 @@ messaging.onBackgroundMessage((payload) => {
       });
     });
   });
+
+  // Return the promise chain to keep the service worker alive until finished
+  return Promise.all([notificationPromise, syncPromise]);
 });
