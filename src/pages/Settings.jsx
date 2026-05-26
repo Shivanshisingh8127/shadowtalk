@@ -570,7 +570,17 @@ export default function Settings() {
               {user?.shadowId?.substring(0, 16)}...
             </span>
           </div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '20px' }}>Your public Shadow ID for connecting</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Your public Shadow ID for connecting</div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '24px' }}>
+            <button className="btn-secondary" onClick={handleShareId} style={{ width: 'auto', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+              <Share2Icon size={16} /> Share
+            </button>
+            <button className="btn-secondary" onClick={handleCopyId} style={{ width: 'auto', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+              {copied ? <CheckIcon size={16} color="var(--accent-primary)" /> : <CopyIcon size={16} />} 
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
 
           {user?.recoveryId && (
             <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: 'rgba(255, 68, 68, 0.05)', borderRadius: '16px', border: '1px solid rgba(255, 68, 68, 0.2)' }}>
@@ -592,16 +602,6 @@ export default function Settings() {
               </div>
             </div>
           )}
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-            <button className="btn-secondary" onClick={handleShareId} style={{ width: 'auto', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
-              <Share2Icon size={16} /> Share
-            </button>
-            <button className="btn-secondary" onClick={handleCopyId} style={{ width: 'auto', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
-              {copied ? <CheckIcon size={16} color="var(--accent-primary)" /> : <CopyIcon size={16} />} 
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
         </div>
 
 
