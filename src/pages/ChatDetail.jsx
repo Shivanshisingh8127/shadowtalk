@@ -1964,7 +1964,10 @@ export default function ChatDetail() {
             }
             const isFirstUnread = initialUnreadCount > 0 && idx === chatMessages.length - initialUnreadCount;
 
-
+            const internalSystemTypes = ['profile_sync', 'member_left', 'member_added', 'member_removed', 'member_promoted', 'member_demoted'];
+            if (internalSystemTypes.includes(msg.type)) {
+              return null;
+            }
 
             if (msg.type === 'notification') {
               return (
@@ -2458,7 +2461,7 @@ export default function ChatDetail() {
                         )}
                       </div>
                     )}
-                    {msg.text && msg.type !== 'call' && <span style={{ lineHeight: '1.4', wordBreak: 'break-word' }}>{highlightedText}</span>}
+                    {msg.text && msg.type !== 'call' && <span style={{ lineHeight: '1.4', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{highlightedText}</span>}
                   </div>
                   <div style={{
                     display: 'flex',
