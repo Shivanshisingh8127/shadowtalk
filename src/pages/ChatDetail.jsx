@@ -1685,7 +1685,7 @@ export default function ChatDetail() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
               <button className="icon-btn" onClick={() => navigate(-1)} style={{ margin: '0 -10px' }}>
                 <ArrowLeftIcon size={24} />
               </button>
@@ -1708,8 +1708,8 @@ export default function ChatDetail() {
                 ) : (
                   <DefaultAvatar name={name} size={40} />
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                     {isRenaming ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                         <input 
@@ -1738,11 +1738,15 @@ export default function ChatDetail() {
                       </div>
                     ) : (
                       <>
-                        <span className="header-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: (!isReadOnly && (!isGroup || isAdmin)) ? 'pointer' : 'default', overflow: 'hidden', maxWidth: '100%' }} onClick={(e) => { e.stopPropagation(); if(!isReadOnly && (!isGroup || isAdmin)) { setNewName(name); setIsRenaming(true); } }}>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                        <span className="header-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: (!isReadOnly && (!isGroup || isAdmin)) ? 'pointer' : 'default', overflow: 'hidden', maxWidth: '100%', flex: 1 }} onClick={(e) => { e.stopPropagation(); if(!isReadOnly && (!isGroup || isAdmin)) { setNewName(name); setIsRenaming(true); } }}>
+                          {name.length > 15 ? (
+                            <marquee scrollamount="4" behavior="scroll" direction="left" style={{ flex: 1, minWidth: 0, paddingRight: '4px' }}>{name}</marquee>
+                          ) : (
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                          )}
                           {!isReadOnly && (!isGroup || isAdmin) && <Edit2Icon size={14} style={{ opacity: 0.5, flexShrink: 0 }} />}
                         </span>
-                        <ShieldCheckIcon size={16} color="var(--accent-primary)" style={{ opacity: 0.9 }} title="End-to-End Encrypted" />
+                        <ShieldCheckIcon size={16} color="var(--accent-primary)" style={{ opacity: 0.9, flexShrink: 0 }} title="End-to-End Encrypted" />
                         {isGroup && <span style={{ fontSize: '0.7rem', color: isReadOnly ? 'var(--accent-danger)' : 'var(--text-muted)', backgroundColor: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: '4px' }}>{isReadOnly ? 'Read Only' : 'Group'}</span>}
                       </>
                     )}
@@ -1773,7 +1777,7 @@ export default function ChatDetail() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <button className="icon-btn" onClick={() => setIsSearchMode(true)}>
                 <SearchIcon size={22} />
               </button>
